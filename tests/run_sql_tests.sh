@@ -19,6 +19,11 @@ q -d "$DB" -f supabase/schema.sql >/dev/null 2>&1 || exit 1
 n=$(q -d "$DB" -tA -c "select count(*) from public.customers where name = 'Üçüncü' and stage = 'sale_done'")
 [ "$n" = "1" ] || { echo "geri doldurma çalışmadı (n=$n)"; exit 1; }
 echo "ok: temiz kurulum, iş kuralları, geri doldurma"
+# Sıfırlama betiği: işletmelerden doğan müşteriler gider, elle eklenenler ve roller kalır
+q -d "$DB" -f supabase/reset_test_data.sql >/dev/null 2>&1 || { echo "reset_test_data.sql hata verdi"; exit 1; }
+r=$(q -d "$DB" -tA -c "select (select count(*) from public.businesses) || ',' || (select count(*) from public.customers where business_id is not null) || ',' || (select count(*) from public.customers where name = 'Elle Eklenen Kafe') || ',' || (select count(*) from public.user_roles) || ',' || (select count(*) from public.closed_regions)")
+[ "$r" = "0,0,1,3,1" ] || { echo "sıfırlama beklenmeyen sonuç verdi (işletme,bağlı müşteri,elle müşteri,rol,kapalı bölge = $r)"; exit 1; }
+echo "ok: sıfırlama betiği (bağlı müşteriler silindi; elle müşteri, roller, kapalı bölge korundu)"
 
 # 2) Eski şemadan yükseltme: veri korunur, kullanıcılar rolsüz kalmaz (en eski = yönetici)
 DB2="u_$STAMP"; newdb "$DB2"

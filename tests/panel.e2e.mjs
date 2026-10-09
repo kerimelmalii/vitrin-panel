@@ -64,7 +64,7 @@ await page.waitForSelector('#biz:not(.hide)'); ok('giriş sonrası kart geldi');
 
 assert.equal(await txt('#roleBadge'), 'Yönetici');
 assert.equal(await page.locator('#tabs [data-nav]:not(.hide)').count(), 5); ok('yönetici beş bölümü de görür, rol rozeti görünür');
-assert.equal(await txt('#n_customers'), '1'); ok('müşteriler rozeti üretimdeki müşteri sayısını gösterir');
+assert.equal(await txt('#n_customers'), '1'); ok('müşteriler rozeti üretimdeki müşteri sayısını gösterir (satır indirmeden, sayım sorgusuyla)');
 
 await page.waitForTimeout(700); await shot('02-whatsapp'); await axe('whatsapp kartı');
 assert.equal(await txt('#bName'), 'Mavi Kuaför | Çankaya Saç Tasarım'); ok('en yüksek skorlu cep numarası WhatsApp listesinde ilk');
@@ -116,6 +116,7 @@ assert.equal((await last('log_call'))[1].p_outcome, 'do_not_contact'); ok('"dur 
 await page.click('[data-nav="customers"]'); await page.waitForSelector('.cust');
 assert.equal(await page.locator('.cust').count(), 2); assert.match(await txt('#stageBar'), /Tümü\s*2/);
 assert.match(await txt('#custTiles'), /2\s+müşteri/); assert.match(await txt('#custTiles'), /1\s+üretimde/);
+assert.ok((await page.evaluate(() => window.__ranges || [])).some(r => r[0] === 'v_customers' && r[1] === 0 && r[2] === 999)); assert.equal(await vis('#custTrunc'), false);
 assert.ok(await page.locator('.cust .cust-meta .bad').count() >= 1); await shot('05-musteriler'); await axe('müşteriler'); ok('müşteri panosu: aşama sayaçları, özet, geciken adım kırmızı');
 await page.fill('#custSearch', 'ESKİ'); await page.waitForFunction(() => document.querySelectorAll('.cust').length === 1);
 assert.match(await txt('.cust'), /Eski Müşteri/); await page.fill('#custSearch', ''); await page.waitForFunction(() => document.querySelectorAll('.cust').length === 2); ok('Türkçe büyük/küçük harfe duyarsız arama');

@@ -87,6 +87,17 @@
       const r = handlers[name](args || {});
       return r && r.error ? { data: null, error: r.error } : { data: r, error: null };
     },
-    from: table => { const q = { select: () => q, eq: () => q, order: () => q, limit: () => Promise.resolve({ data: (tableData[table] || (() => []))(), error: null }) }; return q; },
+    from: table => {
+      const rows = () => (tableData[table] || (() => []))();
+      let inStage = null, head = false;
+      const q = {
+        select: (_cols, opts) => { head = !!(opts && opts.head); return q; }, eq: () => q, order: () => q,
+        in: (_c, vals) => { inStage = vals; return q; },
+        limit: () => Promise.resolve({ data: rows(), error: null }),
+        range: (a, b) => { window.__ranges = (window.__ranges || []).concat([[table, a, b]]); return Promise.resolve({ data: rows().slice(a, b + 1), error: null }); },
+        then: (res, rej) => { const r = rows().filter(x => !inStage || inStage.includes(x.stage)); return Promise.resolve(head ? { data: null, count: r.length, error: null } : { data: r, error: null }).then(res, rej); },
+      };
+      return q;
+    },
   }) };
 })();

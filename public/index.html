@@ -392,6 +392,7 @@
       </div>
       <div class="stagebar" id="stageBar" role="group" aria-label="Aşama filtresi"></div>
       <div class="tiles" id="custTiles" style="margin:4px 0 16px"></div>
+      <p id="custTrunc" class="hint hide" role="status">Çok fazla müşteri var: en son güncellenen 5000 kayıt gösteriliyor. Eskileri bulmak için aşama filtresini veya aramayı kullanın.</p>
       <div id="custList"></div>
       <div id="custEmpty" class="card empty hide">
         <svg viewBox="0 0 80 80" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="muted"><circle cx="40" cy="30" r="12" opacity=".4"/><path d="M16 66c2-14 12-20 24-20s22 6 24 20" opacity=".4"/><path d="M52 18l6 6 10-12" stroke="url(#grad)" stroke-width="4"/></svg>
@@ -823,14 +824,26 @@ const FLOW = ['sale_done','collecting','designing','client_review','live'];
 const IN_WORK = ['sale_done','collecting','designing','client_review'];
 let customers = [], custStage = 'all', custTerm = '', cur = null, pendingStage = null;
 
-async function loadCustomers(){
-  const { data, error } = await sb.from('v_customers').select('*').order('stage_changed_at',{ascending:false}).limit(500);
-  if(error){ fail(error); return; }
-  customers = data || []; renderCustomers(); updateCustomerBadge();
+const CUST_PAGE = 1000, CUST_MAX_PAGES = 5;   // Supabase tek istekte en çok 1000 satır döndürür
+async function fetchCustomers(){
+  let all = [];
+  for(let i=0;i<CUST_MAX_PAGES;i++){
+    const { data, error } = await sb.from('v_customers').select('*').order('stage_changed_at',{ascending:false}).range(i*CUST_PAGE, (i+1)*CUST_PAGE-1);
+    if(error) return { error };
+    all = all.concat(data||[]);
+    if((data||[]).length < CUST_PAGE) return { data:all, truncated:false };
+  }
+  return { data:all, truncated:true };
 }
-async function loadCustomerBadge(){
-  const { data } = await sb.from('v_customers').select('id,stage').limit(500);
-  if(data) $('n_customers').textContent = data.filter(c=>IN_WORK.includes(c.stage)).length || '';
+async function loadCustomers(){
+  const r = await fetchCustomers();
+  if(r.error){ fail(r.error); return; }
+  customers = r.data; $('custTrunc').classList.toggle('hide', !r.truncated);
+  renderCustomers(); updateCustomerBadge();
+}
+async function loadCustomerBadge(){   // yalnızca sayım: satırları indirmeden
+  const { count } = await sb.from('v_customers').select('id',{count:'exact',head:true}).in('stage', IN_WORK);
+  $('n_customers').textContent = count || '';
 }
 function updateCustomerBadge(){ $('n_customers').textContent = customers.filter(c=>IN_WORK.includes(c.stage)).length || ''; }
 
