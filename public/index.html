@@ -58,6 +58,11 @@
   td,th{padding:12px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
   th{color:var(--mute);font-weight:500;font-size:13px}
   tr:last-child td{border-bottom:0}
+  nav{max-width:100%;overflow-x:auto}
+  nav button .n{font-size:12px;color:var(--mute);margin-left:4px}
+  nav button.on .n{color:var(--brand)}
+  .btn[disabled]{opacity:.5;cursor:default}
+  .wa-extra{display:flex;gap:14px;align-items:center;margin-top:10px;font-size:14px}
   #toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(8px);background:rgba(29,29,31,.92);color:#fff;font-size:15px;padding:11px 20px;border-radius:999px;opacity:0;transition:.25s;pointer-events:none}
   #toast.on{opacity:1;transform:translateX(-50%)}
   .hide{display:none!important}
@@ -90,15 +95,17 @@
     <header>
       <h1>Vitrin</h1>
       <div class="stats">
-        <span>Arama <b id="weekCount">0</b>/<span id="weekGoal">100</span></span>
-        <span>Kuyruk <b id="queueCount">-</b></span>
-        <span>WhatsApp <b id="waToday">0</b></span>
+        <span>Hafta <b id="weekCount">0</b>/<span id="weekGoal">100</span></span>
+        <span>Bugün <b id="todayCount">0</b></span>
+        <span>WhatsApp <b id="waToday">0</b>/<span id="waLimit">25</span></span>
         <button class="link" id="logout">Çıkış</button>
       </div>
     </header>
-    <nav>
-      <button id="tabCall" class="on">Arama</button>
-      <button id="tabHist">Geçmiş</button>
+    <nav id="tabs">
+      <button data-tab="whatsapp" class="on">WhatsApp<span class="n" id="n_whatsapp"></span></button>
+      <button data-tab="call">Arama<span class="n" id="n_call"></span></button>
+      <button data-tab="followup">Takip<span class="n" id="n_followup"></span></button>
+      <button data-tab="hist">Geçmiş</button>
     </nav>
 
     <!-- Arama sekmesi -->
@@ -107,7 +114,7 @@
         <select id="cityFilter"><option value="">Tüm şehirler</option></select>
         <select id="sectorFilter"><option value="">Tüm sektörler</option></select>
       </div>
-      <div id="empty" class="card center hide">Şu an aranacak işletme yok.<br>Yeni bölge taratın veya filtreyi değiştirin.</div>
+      <div id="empty" class="card center hide" aria-live="polite">Bu listede şu an işletme yok.<br>Başka sekmeye bakın, filtreyi değiştirin veya yeni bölge taratın.</div>
       <div id="biz" class="card hide">
         <p class="name" id="bName"></p>
         <div class="meta" id="bAddr"></div>
@@ -121,6 +128,7 @@
           <button class="link" id="tplToggle">Mesajı düzenle</button>
         </div>
         <div class="wahint" id="waHint"></div>
+        <div class="wa-extra"><button class="link" id="toCallList">Arama listesine al</button></div>
         <div id="tplBox" class="hide">
           <label>Mesaj şablonu ({isim} işletme adıyla değişir; "dur" cümlesini silme)</label>
           <textarea id="tplText"></textarea>
@@ -130,7 +138,7 @@
         <textarea id="note" placeholder="Görüşme notu (kiminle konuşuldu, ne dedi, ne zaman tekrar aransın...)"></textarea>
 
         <div class="grid">
-          <button class="btn ok" data-o="wa_sent">WhatsApp gönderdim</button>
+          <button class="btn ok" data-o="wa_sent" id="btnWaSent">WhatsApp gönderdim</button>
           <button class="btn warn" data-o="no_answer">Açmadı / ulaşılamadı</button>
           <button class="btn" data-o="callback">Sonra ara…</button>
           <button class="btn ok" data-o="interested">İlgilendi</button>
@@ -177,69 +185,70 @@ const WA_DAILY_LIMIT = 25;   // önerilen günlük üst sınır (engellemez, uya
 
 function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('on'); setTimeout(()=>t.classList.remove('on'),2200); }
 function fmt(d){ return d ? new Date(d).toLocaleString('tr-TR',{dateStyle:'short',timeStyle:'short'}) : ''; }
-function mondayISO(){ const d=new Date(); const day=(d.getDay()+6)%7; d.setHours(0,0,0,0); d.setDate(d.getDate()-day); return d.toISOString(); }
 function addTag(parent, text){ const s=document.createElement('span'); s.className='tag'; s.textContent=text; parent.appendChild(s); }
+
+// ---- Yardımcılar ----
+const LISTS = ['whatsapp','call','followup'];
+let list = 'whatsapp', seq = 0;
+const fail = (e)=>{ console.error(e); toast('Hata: '+(e && e.message ? e.message : e)); };
 
 // ---- Oturum ----
 async function init(){
-  $('weekGoal').textContent = WEEKLY_GOAL;
+  $('weekGoal').textContent = WEEKLY_GOAL; $('waLimit').textContent = WA_DAILY_LIMIT;
   const { data:{ session } } = await sb.auth.getSession();
   session ? showApp() : showLogin();
 }
-function showLogin(){ $('login').classList.remove('hide'); $('app').classList.add('hide'); }
+function showLogin(){ current=null; $('login').classList.remove('hide'); $('app').classList.add('hide'); $('password').value=''; }
 async function showApp(){
   $('login').classList.add('hide'); $('app').classList.remove('hide');
-  await loadFilters(); await refreshCounts(); await loadNext();
+  await Promise.all([loadFilters(), refreshCounts()]); await loadNext();
 }
 $('loginForm').addEventListener('submit', async e=>{
   e.preventDefault(); $('loginErr').textContent='';
-  const { error } = await sb.auth.signInWithPassword({ email:$('email').value, password:$('password').value });
+  const { error } = await sb.auth.signInWithPassword({ email:$('email').value.trim(), password:$('password').value });
   error ? $('loginErr').textContent='E-posta veya şifre hatalı.' : showApp();
 });
-$('logout').onclick = async ()=>{ await sb.auth.signOut(); showLogin(); };
+$('logout').onclick = async ()=>{ await release(); await sb.auth.signOut(); showLogin(); };
+async function release(){ if(current){ const id=current.id; current=null; await sb.rpc('release_business',{p_business_id:id}); } }
 
 // ---- Filtreler (şehir/sektör) ----
 async function loadFilters(){
-  const { data } = await sb.from('businesses').select('city,sector').eq('status','new').limit(5000);
-  const cities=[...new Set((data||[]).map(r=>r.city))].sort((a,b)=>a.localeCompare(b,'tr'));
-  const sectors=[...new Set((data||[]).map(r=>r.sector))].sort((a,b)=>a.localeCompare(b,'tr'));
-  const fill=(sel,list,all)=>{ const v=sel.value; sel.replaceChildren(new Option(all,'')); list.forEach(x=>sel.add(new Option(x,x))); sel.value=v; };
+  const { data, error } = await sb.rpc('filter_options');
+  if(error){ fail(error); return; }
+  const cities=[...new Set((data||[]).map(r=>r.city).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'tr'));
+  const sectors=[...new Set((data||[]).map(r=>r.sector).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'tr'));
+  const fill=(sel,items,all)=>{ const v=sel.value; sel.replaceChildren(new Option(all,'')); items.forEach(x=>sel.add(new Option(x,x))); sel.value=items.includes(v)?v:''; };
   fill($('cityFilter'),cities,'Tüm şehirler'); fill($('sectorFilter'),sectors,'Tüm sektörler');
 }
-$('cityFilter').onchange = $('sectorFilter').onchange = ()=>{ skipped.clear(); refreshCounts(); loadNext(); };
+$('cityFilter').onchange = $('sectorFilter').onchange = async ()=>{ await release(); skipped.clear(); await refreshCounts(); await loadNext(); };
 
-function applyFilters(q){
-  if($('cityFilter').value)   q=q.eq('city',$('cityFilter').value);
-  if($('sectorFilter').value) q=q.eq('sector',$('sectorFilter').value);
-  return q;
-}
-const dueFilter = ()=>{ const n=new Date().toISOString(); return `status.eq.new,and(status.eq.no_answer,no_answer_count.lt.3,next_action_at.lte.${n}),and(status.eq.wa_sent,next_action_at.lte.${n})`; };
-
+// ---- Sayaçlar ----
 async function refreshCounts(){
-  const wk = await sb.from('calls').select('id',{count:'exact',head:true}).gte('called_at',mondayISO()).neq('outcome','wa_sent');
-  $('weekCount').textContent = wk.count ?? 0;
-  const t0 = new Date(); t0.setHours(0,0,0,0);
-  const wa = await sb.from('calls').select('id',{count:'exact',head:true}).gte('called_at',t0.toISOString()).eq('outcome','wa_sent');
-  waTodayCount = wa.count ?? 0; $('waToday').textContent = waTodayCount + ' / ' + WA_DAILY_LIMIT;
-  const nowIso = new Date().toISOString();
-  let q1 = applyFilters(sb.from('businesses').select('id',{count:'exact',head:true}).eq('status','callback').lte('next_action_at',nowIso));
-  let q2 = applyFilters(sb.from('businesses').select('id',{count:'exact',head:true}).or(dueFilter()));
-  const [a,b] = await Promise.all([q1,q2]);
-  $('queueCount').textContent = (a.count||0)+(b.count||0);
+  const [st, ct] = await Promise.all([
+    sb.rpc('stats'),
+    sb.rpc('list_counts',{ p_city:$('cityFilter').value||null, p_sector:$('sectorFilter').value||null })
+  ]);
+  if(st.error) fail(st.error); else {
+    const s=(st.data&&st.data[0])||{};
+    $('weekCount').textContent = s.week_total ?? 0; $('todayCount').textContent = s.today_total ?? 0;
+    waTodayCount = Number(s.today_wa ?? 0); $('waToday').textContent = waTodayCount;
+    $('waToday').parentElement.classList.toggle('warn', waTodayCount >= WA_DAILY_LIMIT);
+  }
+  if(ct.error) fail(ct.error); else {
+    const m = Object.fromEntries((ct.data||[]).map(r=>[r.lst, Number(r.n)]));
+    LISTS.forEach(l=>{ $('n_'+l).textContent = m[l] ? ' '+m[l] : ''; });
+  }
 }
 
-// ---- Sıradaki işletme ----
+// ---- Sıradaki işletme (sunucu seçer ve 15 dk kilitler: iki kişi aynı kartı görmez) ----
 async function loadNext(){
+  const my = ++seq;
   current = null; $('cbBox').classList.add('hide'); $('note').value='';
-  // 1) vadesi gelen geri aramalar  2) yeni / tekrar denenecek, skoru yüksek olan önce
-  let r = await applyFilters(sb.from('businesses').select('*').eq('status','callback')
-            .lte('next_action_at',new Date().toISOString()).order('next_action_at').limit(30));
-  let pick = (r.data||[]).find(b=>!skipped.has(b.id));
-  if(!pick){
-    r = await applyFilters(sb.from('businesses').select('*').or(dueFilter())
-          .order('lead_score',{ascending:false}).order('created_at').limit(30));
-    pick = (r.data||[]).find(b=>!skipped.has(b.id));
-  }
+  const r = await sb.rpc('next_business',{ p_list:list, p_city:$('cityFilter').value||null,
+                                           p_sector:$('sectorFilter').value||null, p_skip:[...skipped] });
+  if(my !== seq) return;                       // aradan başka bir istek geçtiyse bunu yok say
+  if(r.error){ $('biz').classList.add('hide'); fail(r.error); return; }
+  const pick = (r.data||[])[0];
   if(!pick){ $('biz').classList.add('hide'); $('empty').classList.remove('hide'); return; }
   current = pick; $('empty').classList.add('hide'); $('biz').classList.remove('hide');
   $('bName').textContent = pick.name;
@@ -251,11 +260,12 @@ async function loadNext(){
   addTag(tags, `Skor ${pick.lead_score}`);
   const ph=$('bPhone'); ph.textContent = pick.phone_raw; ph.href = 'tel:'+(pick.phone_normalized||'');
   setupWa(pick); $('tplBox').classList.add('hide');
-  const mp=$('bMaps'); const okMaps=/^https:\/\//.test(pick.maps_url||''); mp.href = okMaps ? pick.maps_url : '#'; mp.classList.toggle('hide',!okMaps);
+  const okMaps=/^https:\/\//.test(pick.maps_url||''); const mp=$('bMaps'); mp.href = okMaps ? pick.maps_url : '#'; mp.classList.toggle('hide',!okMaps);
   const h=$('bHistory'); h.textContent='';
   if(pick.attempt_count>0){
     const c = await sb.from('calls').select('called_at,outcome,note').eq('business_id',pick.id).order('called_at',{ascending:false}).limit(3);
-    h.textContent = 'Önceki aramalar: ' + (c.data||[]).map(x=>`${fmt(x.called_at)} – ${OUTCOME_TR[x.outcome]}${x.note?' ('+x.note+')':''}`).join(' • ');
+    if(my !== seq) return;
+    h.textContent = 'Önceki: ' + (c.data||[]).map(x=>`${fmt(x.called_at)} – ${OUTCOME_TR[x.outcome]}${x.note?' ('+x.note+')':''}`).join(' • ');
   }
 }
 
@@ -275,6 +285,8 @@ function waLink(b){
 }
 function setupWa(b){
   const btn=$('waBtn'), hint=$('waHint');
+  $('toCallList').classList.toggle('hide', !(isMobile(b) && b.status==='new' && !b.call_list));
+  $('btnWaSent').classList.toggle('hide', !isMobile(b));
   if(isMobile(b)){ btn.disabled=false; btn.textContent="WhatsApp'tan yaz";
     hint.textContent = "WhatsApp mesajı hazır yazılmış açılır. Gözden geçir, kendin gönder, sonra \"WhatsApp gönderdim\" de."; }
   else { btn.disabled=true; btn.textContent='Sabit hat, WhatsApp yok';
@@ -313,38 +325,46 @@ document.querySelectorAll('[data-o]').forEach(btn=>btn.addEventListener('click',
   save(o);
 }));
 $('cbSave').onclick = ()=>{ const v=$('cbAt').value; if(!v){toast('Tarih seçin');return;} save('callback', new Date(v).toISOString()); };
-$('skip').onclick = ()=>{ if(current){ skipped.add(current.id); loadNext(); } };
+$('skip').onclick = async ()=>{ if(current){ skipped.add(current.id); await release(); await loadNext(); } };
+$('toCallList').onclick = async ()=>{
+  if(!current || busy) return; busy = true;
+  const { error } = await sb.rpc('move_to_call_list',{ p_business_id:current.id });
+  busy = false;
+  if(error){ fail(error); return; }
+  toast('Arama listesine alındı'); await refreshCounts(); await loadNext();
+};
 
 // ---- Sekmeler / Geçmiş ----
-function tab(which){
-  $('callView').classList.toggle('hide',which!=='call'); $('histView').classList.toggle('hide',which!=='hist');
-  $('tabCall').classList.toggle('on',which==='call'); $('tabHist').classList.toggle('on',which==='hist');
-  if(which==='hist') loadHistory();
+async function tab(which){
+  document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on', b.dataset.tab===which));
+  const isHist = which==='hist';
+  $('callView').classList.toggle('hide',isHist); $('histView').classList.toggle('hide',!isHist);
+  await release();
+  if(isHist){ loadHistory(); return; }
+  list = which; skipped.clear(); $('empty').classList.add('hide'); $('biz').classList.add('hide');
+  await refreshCounts(); await loadNext();
 }
-$('tabCall').onclick=()=>tab('call'); $('tabHist').onclick=()=>tab('hist');
+document.querySelectorAll('#tabs button').forEach(b=>b.addEventListener('click',()=>tab(b.dataset.tab)));
 let hTimer; $('histSearch').oninput=()=>{ clearTimeout(hTimer); hTimer=setTimeout(loadHistory,300); };
 
 async function loadHistory(){
-  const term = $('histSearch').value.trim();
-  const { data: all, error } = await sb.from('calls')
-    .select('called_at,outcome,note,callback_at,businesses!inner(name,phone_raw,city)')
-    .order('called_at',{ascending:false}).limit(400);
-  const t = term.toLocaleLowerCase('tr');
-  const data = (all||[]).filter(c=>!t || (c.businesses.name+' '+(c.note||'')).toLocaleLowerCase('tr').includes(t)).slice(0,150);
+  const { data, error } = await sb.rpc('search_history',{ p_term:$('histSearch').value.trim(), p_limit:150 });
   const tbl=$('histTable'); tbl.replaceChildren();
   const head=tbl.insertRow(); ['Tarih','İşletme','Sonuç','Not'].forEach(x=>{const th=document.createElement('th'); th.textContent=x; head.appendChild(th);});
-  if(error){ toast(error.message); return; }
+  if(error){ fail(error); return; }
   (data||[]).forEach(c=>{
     const r=tbl.insertRow();
     r.insertCell().textContent = fmt(c.called_at);
-    const n=r.insertCell(); n.textContent = c.businesses.name; const s=document.createElement('div'); s.className='muted'; s.textContent=c.businesses.phone_raw; n.appendChild(s);
-    r.insertCell().textContent = OUTCOME_TR[c.outcome] + (c.callback_at ? ' → '+fmt(c.callback_at) : '');
+    const n=r.insertCell(); n.textContent = c.name; const s=document.createElement('div'); s.className='muted'; s.textContent=c.phone_raw||''; n.appendChild(s);
+    r.insertCell().textContent = (OUTCOME_TR[c.outcome]||c.outcome) + (c.callback_at ? ' → '+fmt(c.callback_at) : '');
     r.insertCell().textContent = c.note || '';
   });
 }
 
 // Oturum süresi dolarsa/çıkış yapılırsa giriş ekranına dön
 sb.auth.onAuthStateChange((ev)=>{ if(ev==='SIGNED_OUT') showLogin(); });
+// Sekme kapanırken açık kartın kilidini bırak
+window.addEventListener('pagehide',()=>{ if(current) sb.rpc('release_business',{p_business_id:current.id}); });
 
 init();
 </script>
