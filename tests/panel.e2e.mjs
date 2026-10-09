@@ -1,6 +1,6 @@
 // Panel uçtan uca testi: gerçek Chromium + sahte Supabase istemcisi (tests/fake-supabase.js, ağ yok).
 // Çalıştırma: node tests/panel.e2e.mjs   (playwright yerelde ya da global kurulu olmalı)
-// İsteğe bağlı: SHOTS=klasör (ekran görüntüleri) · SCHEME=dark · VIEW=1280x860 · AXE=/yol/axe.min.js (erişilebilirlik taraması)
+// İsteğe bağlı: SHOTS=klasör (ekran görüntüleri) · VIEW=1280x860 · AXE=/yol/axe.min.js (erişilebilirlik taraması)
 import { createRequire } from 'node:module';
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -14,25 +14,34 @@ assert.ok(html.includes('/fake-supabase.js'), 'CDN etiketi bulunamadı');
 const fake = fs.readFileSync(new URL('./fake-supabase.js', import.meta.url), 'utf8');
 
 const [VW, VH] = (process.env.VIEW || '390x844').split('x').map(Number);
-const SCHEME = process.env.SCHEME || 'light';
 const SHOTS = process.env.SHOTS; if (SHOTS) fs.mkdirSync(SHOTS, { recursive: true });
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
 let step = 0; const ok = m => console.log(`ok ${++step} – ${m}`);
 const IGNORED = /Failed to load resource: the server responded with a status of (400|404|429)/;   // sahte servis hataları beklenir
 
 async function mk({ role = 'admin', preLogged = false, accessError = false } = {}) {
-  const ctx = await browser.newContext({ viewport: { width: VW, height: VH }, colorScheme: SCHEME });
+  const ctx = await browser.newContext({ viewport: { width: VW, height: VH }, colorScheme: 'light' });
   const page = await ctx.newPage(); const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   page.on('console', m => { if (m.type() === 'error' && !IGNORED.test(m.text())) errors.push(m.text()); });
-  await page.route('https://panel.test/fake-supabase.js', r => r.fulfill({ contentType: 'text/javascript', body: fake }));
-  await page.route('https://panel.test/', r => r.fulfill({ contentType: 'text/html', body: html }));
+  await page.route('https://panel.test/**', r => {
+    const path = new URL(r.request().url()).pathname;
+    if (path === '/') return r.fulfill({ contentType: 'text/html', body: html });
+    if (path === '/fake-supabase.js') return r.fulfill({ contentType: 'text/javascript', body: fake });
+    const file = new URL('../public' + path, import.meta.url);   // yazı tipi, logo, ikon, manifest
+    if (!path.includes('..') && fs.existsSync(file) && fs.statSync(file).isFile()) {
+      const ext = path.split('.').pop(); const types = { png: 'image/png', svg: 'image/svg+xml', woff2: 'font/woff2', webmanifest: 'application/manifest+json' };
+      return r.fulfill({ contentType: types[ext] || 'application/octet-stream', body: fs.readFileSync(file) });
+    }
+    return r.fulfill({ status: 404, body: 'yok' });
+  });
   await page.addInitScript(([role, preLogged, accessError]) => {
     window.__role = role; window.__preLogged = preLogged; window.__accessError = accessError; window.__opened = [];
     window.open = u => { window.__opened.push(u); return null; };
   }, [role, preLogged, accessError]);
   const t = {
     txt: sel => page.locator(sel).innerText(),
+    raw: sel => page.locator(sel).textContent(),   // CSS büyük harf dönüşümünden etkilenmez
     calls: () => page.evaluate(() => window.__calls),
     count: async n => (await t.calls()).filter(c => c[0] === n).length,
     last: async n => (await t.calls()).filter(c => c[0] === n).at(-1),
@@ -53,7 +62,7 @@ async function mk({ role = 'admin', preLogged = false, accessError = false } = {
 
 // =============================================================== 1) YÖNETİCİ: tam akış
 const { ctx, page, errors, t } = await mk();
-const { txt, calls, count, last, vis, shot, axe } = t;
+const { txt, raw, calls, count, last, vis, shot, axe } = t;
 
 await page.goto('https://panel.test/');
 await page.waitForSelector('#login:not(.hide)'); await shot('01-giris'); await axe('giriş'); ok('giriş ekranı açıldı');
@@ -62,7 +71,7 @@ await page.waitForFunction(() => document.getElementById('loginErr').textContent
 await page.fill('#password', 'dogru'); await page.click('#loginForm button');
 await page.waitForSelector('#biz:not(.hide)'); ok('giriş sonrası kart geldi');
 
-assert.equal(await txt('#roleBadge'), 'Yönetici');
+assert.equal(await raw('#roleBadge'), 'Yönetici');
 assert.equal(await page.locator('#tabs [data-nav]:not(.hide)').count(), 5); ok('yönetici beş bölümü de görür, rol rozeti görünür');
 assert.equal(await txt('#n_customers'), '1'); ok('müşteriler rozeti üretimdeki müşteri sayısını gösterir (satır indirmeden, sayım sorgusuyla)');
 
@@ -80,7 +89,7 @@ await page.click('#toCallList'); await page.waitForFunction(() => document.getEl
 assert.equal(await count('move_to_call_list'), 1); assert.match(await txt('#n_call'), /2/); ok('arama listesine alma çalışıyor');
 assert.equal(await vis('#bMaps'), false); ok('javascript: harita bağlantısı gizlendi');
 await page.click('#btnWaSent'); await page.waitForFunction(() => !document.getElementById('empty').classList.contains('hide'));
-assert.equal((await last('log_call'))[1].p_outcome, 'wa_sent'); assert.equal(await txt('#waToday'), '1'); ok('WhatsApp gönderildi kaydedildi, sayaç arttı, boş durum');
+await shot('03-bos'); assert.equal((await last('log_call'))[1].p_outcome, 'wa_sent'); assert.equal(await txt('#waToday'), '1'); ok('WhatsApp gönderildi kaydedildi, sayaç arttı, boş durum');
 
 await page.click('[data-tab="call"]'); await page.waitForFunction(() => document.getElementById('bName').textContent.startsWith('Mavi'));
 assert.equal(await vis('#toCallList'), false); ok('arama listesine alınan cep numarası Arama sekmesinde');
@@ -224,7 +233,7 @@ await ctx.close();
 { // tasarımcı: yalnızca müşteriler
   const r = await mk({ role: 'designer', preLogged: true }); const p = r.page;
   await p.goto('https://panel.test/'); await p.waitForSelector('#customersView:not(.hide)'); await p.waitForSelector('.cust');
-  assert.equal(await r.t.txt('#roleBadge'), 'Tasarımcı'); assert.equal(await r.t.vis('#tabs'), false); assert.equal(await r.t.vis('#goalBox'), false);
+  assert.equal(await r.t.raw('#roleBadge'), 'Tasarımcı'); assert.equal(await r.t.vis('#tabs'), false); assert.equal(await r.t.vis('#goalBox'), false);
   const names = (await r.t.calls()).map(c => c[0]);
   for (const n of ['stats', 'list_counts', 'next_business', 'filter_options', 'team_list']) assert.ok(!names.includes(n), `tasarımcı ${n} çağırmamalı`);
   await r.t.shot('12-tasarimci'); await r.t.axe('tasarımcı');
@@ -236,7 +245,7 @@ await ctx.close();
 { // satış: ekip yok
   const r = await mk({ role: 'sales', preLogged: true }); const p = r.page;
   await p.goto('https://panel.test/'); await p.waitForSelector('#biz:not(.hide)');
-  assert.equal(await r.t.txt('#roleBadge'), 'Satış'); assert.equal(await p.locator('#tabs [data-nav]:not(.hide)').count(), 4); assert.equal(await p.locator('[data-nav="team"]').isVisible(), false);
+  assert.equal(await r.t.raw('#roleBadge'), 'Satış'); assert.equal(await p.locator('#tabs [data-nav]:not(.hide)').count(), 4); assert.equal(await p.locator('[data-nav="team"]').isVisible(), false);
   ok('satış: ekip sekmesi gizli, diğer dört bölüm açık'); assert.deepEqual(r.errors, []); await r.ctx.close();
 }
 { // rolsüz
