@@ -1,11 +1,11 @@
-# Vitrin Web – müşteri bulma ve arama sistemi
+# Vitrin Web – müşteri bulma, satış ve proje takip paneli
 
 Google Haritalar'da puanı yüksek ama web sitesi olmayan işletmeleri bölge bölge bulur; ekip WhatsApp'tan yazar / arar,
 sonuçlar kaydedilir, aranan işletme bir daha çıkmaz. Hedef: haftada ~100 temas, günde en fazla ~25 WhatsApp.
 
 | Parça | Dosya | Nerede çalışır |
 |---|---|---|
-| Veritabanı | `supabase/schema.sql` | Supabase |
+| Veritabanı, roller, müşteri hattı | `supabase/schema.sql` | Supabase |
 | Tarama (panelden) | `supabase/functions/scan/index.ts` | Supabase Edge Function |
 | Tarama (terminalden, isteğe bağlı) | `scan.py` | Sadece sizin Mac'iniz |
 | Panel | `public/index.html` | Vercel (`panel.vitrinweb.com.tr`) |
@@ -21,6 +21,37 @@ sonuçlar kaydedilir, aranan işletme bir daha çıkmaz. Hedef: haftada ~100 tem
 4. **Panelden tarama (önerilen, bir kez kurulur):** aşağıdaki "Panelden tarama" bölümünü yapın.
    Google anahtarını Places API ile kısıtlayın ve Google Cloud > Faturalama > **Bütçeler ve uyarılar** bölümünden bütçe uyarısı kurun.
 5. *(İsteğe bağlı)* Terminalden taramak için `.env.example` dosyasını `.env` olarak kopyalayıp doldurun (yalnızca kendi Mac'inizde).
+
+## Mevcut kurulumu güncelleme (müşteri hattı + roller sürümü)
+
+Sırayla, kesinti olmadan:
+1. **Supabase > SQL Editor:** `supabase/schema.sql` dosyasının güncel halini çalıştırın. Mevcut veriyi silmez. Mevcut kullanıcılara rol atar: **en eski kullanıcı Yönetici, diğerleri Satış**. Durumu "won" olan eski kayıtlar müşteri olarak eklenir. Eski panel şema güncellenince de çalışmaya devam eder.
+2. **Edge Functions > scan:** `supabase/functions/scan/index.ts` dosyasının yeni halini yapıştırıp yeniden Deploy edin (tarama artık "tarama" iznini de kontrol eder).
+3. Dalı/PR'ı birleştirin; Vercel yeni paneli yayınlar.
+4. Panele girin, **Ekip** sekmesinden arkadaşınıza ve diğer kişilere rol verin.
+
+Panel "Veritabanı güncellemesi gerekli" derse 1. adım yapılmamıştır.
+
+## Müşteriler (satış sonrası takip)
+
+Listede **Satış oldu** dediğiniz işletme otomatik olarak **Müşteriler** sekmesine düşer (görüşme notunuz ilk not olur). Listeden gelmeyen müşteriyi **+ Ekle** ile elle girebilirsiniz.
+
+* **Aşamalar:** Satış gerçekleşti → Bilgi toplanıyor → Site tasarlanıyor → Müşteri onayında → Yayında. Ayrıca Beklemede ve İptal. Aşama değişince isteğe bağlı not yazılır; kim, ne zaman değiştirdi kayda geçer.
+* **Her müşteride:** tutar (TL), alan adı, sıradaki adım ve tarihi (geçen adım kırmızı görünür), sınırsız not ve tam geçmiş (zaman çizelgesi), arama/WhatsApp düğmeleri.
+* **Pano:** aşama sayaçlarına tıklayarak filtreleyin, ad/telefon/alan adı ile arayın; üstte müşteri sayısı, üretimdekiler ve toplam tutar görünür.
+
+## Roller ve yetkiler
+
+Kullanıcıyı **Supabase > Authentication > Users > Add user** ile siz eklersiniz (kayıt kapalıdır). Rolü **Ekip** sekmesinden (yalnızca Yönetici) verirsiniz. **Rolü olmayan kimse hiçbir veri göremez.**
+
+| Rol | Görür / yapar |
+|---|---|
+| **Yönetici** | Her şey: listeler, tarama, müşteriler, ekip ve roller, (ileride) abonelikler |
+| **Satış** | Listeler, geçmiş, tarama, müşteriler. Ekip ve abonelikleri görmez |
+| **Tasarımcı** | Yalnızca müşteriler (aşama, not, tutar, alan adı). Satış listelerini ve taramayı göremez |
+
+Yetkiler arayüzde gizlenmekle kalmaz, veritabanında da zorunludur (satır düzeyinde güvenlik + fonksiyon kontrolleri). Son yöneticiyi kaldırmak/düşürmek engellenir.
+Yeni bir modül (örn. araç abonelikleri: Claude, GitHub…) eklemek için `role_perms` fonksiyonuna izin eklemek yeterlidir; `subscriptions` izni şimdiden yalnızca Yönetici'de tanımlıdır.
 
 ## Panelden tarama (Tara sekmesi)
 
@@ -58,6 +89,7 @@ Açık/koyu temaya kendiliğinden uyar; telefonda alt gezinme çubuğu, bilgisay
 **Masaüstü kısayolları:** `W` WhatsApp'tan yaz, `S` şimdilik atla, `N` nota geç. (Sonuç düğmeleri yanlışlıkla basılmasın diye kısayolsuzdur.)
 
 
+* **Üst menü:** Liste (WhatsApp / Arama / Takip) · Müşteriler · Tara · Geçmiş · Ekip. Menüde yalnızca rolünüzün göreceği bölümler çıkar.
 * **WhatsApp:** yeni + cep numarası. "WhatsApp'tan yaz" hazır mesajla açar, ekip gözden geçirip kendi gönderir, sonra "WhatsApp gönderdim". 3 gün sonra **Takip**'e düşer.
   WhatsApp'ı olmayan ya da yazmak istemediğiniz kayıt için **"Arama listesine al"**.
 * **Arama:** sabit hatlar + arama listesine alınanlar + açmayanlar (günde bir tekrar, en fazla 3 deneme; sonra "ulaşılamaz").
@@ -74,7 +106,7 @@ Açık/koyu temaya kendiliğinden uyar; telefonda alt gezinme çubuğu, bilgisay
 * Tarayıcı veritabanını yalnızca okuyabilir; her yazma `log_call` vb. fonksiyonlarla olur. Kayıt kapalı, giriş yalnızca eklediğiniz kullanıcılarla.
 * Site `noindex`, çerçevelenemez, sıkı CSP ile yayınlanır; `supabase-js` sürümü sabit ve bütünlük (SRI) denetimli.
 * `scan.py`, SQL ve testler `public/` dışında olduğundan internetten indirilemez.
-* Tarama servisi yalnızca giriş yapmış kullanıcıyı kabul eder, girdileri doğrular ve günlük Google çağrı sınırı koyar. Google anahtarı hiçbir yanıtta görünmez.
+* Tarama servisi yalnızca giriş yapmış ve **tarama izni olan** kullanıcıyı kabul eder, girdileri doğrular ve günlük Google çağrı sınırı koyar. Google anahtarı hiçbir yanıtta görünmez.
 
 ## Testler
 

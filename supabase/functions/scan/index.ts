@@ -343,10 +343,14 @@ export async function handle(req: Request, env: Env, f: Fetch = fetch, now = Dat
   try {
     if (req.method !== "POST") throw new UserError("method", "Yalnızca POST.", 405);
     if (!env.SUPABASE_URL || !env.SERVICE_KEY) throw new UserError("not_configured", "Sunucu ayarı eksik.", 500);
-    await authenticate(req, env, f);
+    const userId = await authenticate(req, env, f);
+    const db = new Db(env, f);
+    // Rol/izin kuralları veritabanında tek yerde tutulur (user_can); tarama için "scan" izni gerekir
+    if ((await db.rpc("user_can", { p_user: userId, p_perm: "scan" })) !== true) {
+      throw new UserError("forbidden", "Bu işlem için yetkiniz yok. Yöneticinizden tarama yetkisi isteyin.", 403);
+    }
     let body: any;
     try { body = await req.json(); } catch { throw new UserError("bad_json", "Geçersiz istek."); }
-    const db = new Db(env, f);
     if (body?.action === "plan") return json(req, env, 200, await plan(db, env, body, now));
     if (body?.action === "run") return json(req, env, 200, await run(db, env, f, body, now));
     throw new UserError("bad_action", "Geçersiz işlem.");
