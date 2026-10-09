@@ -47,7 +47,7 @@ test('İstanbul gün başlangıcı', () => {
 });
 
 // ---------------- işleyici: sahte Supabase + Google
-function world({ closed = [], history = [], usage = 0, user = true, places, googleStatus = 200 } = {}) {
+function world({ closed = [], history = [], usage = 0, user = true, places, googleStatus = 200, canScan = true } = {}) {
   const log = { google: 0, ingest: [], history: [], authCalls: 0 };
   const pages = places ?? [{ places: [{ ...basePlace, id: 'a' }, { ...basePlace, id: 'b', rating: 3 }] }];
   const f = async (url, init = {}) => {
@@ -57,6 +57,7 @@ function world({ closed = [], history = [], usage = 0, user = true, places, goog
     if (u.includes('places.googleapis.com')) { log.google++; return googleStatus === 200 ? J(pages[Math.min(log.google - 1, pages.length - 1)]) : new Response('denied AIzaSyABCDEFG', { status: googleStatus }); }
     if (u.includes('/rest/v1/closed_regions')) return J(closed);
     if (u.includes('/rest/v1/scan_history') && !init.method) return J(u.includes('select=api_calls') ? [{ api_calls: usage }] : history);
+    if (u.includes('/rpc/user_can')) { log.perm = body; return J(canScan); }
     if (u.includes('/rpc/ingest_businesses')) { log.ingest.push(body.p_rows); return J(body.p_rows.length); }
     if (u.endsWith('/rest/v1/scan_history') && init.method === 'POST') { log.history.push(body); return new Response(null, { status: 201 }); }
     throw new Error('beklenmeyen çağrı ' + u);
@@ -82,6 +83,14 @@ test('giriş yoksa ya da oturum geçersizse 401, Google/DB çağrılmaz', async 
   assert.equal(r.status, 401);
   r = await call(w, { action: 'plan', city: 'Ankara', sectors: 'kuaför' });
   assert.equal(r.status, 401); assert.equal(w.log.google, 0);
+});
+
+test('tarama izni olmayan rol (örn. tasarımcı) 403 alır, Google çağrılmaz', async () => {
+  const w = world({ canScan: false });
+  const r = await call(w, { action: 'run', city: 'Ankara', district: 'Çankaya', sector: 'kuaför' });
+  assert.equal(r.status, 403); assert.equal((await r.json()).error, 'forbidden');
+  assert.deepEqual(w.log.perm, { p_user: 'u1', p_perm: 'scan' }); assert.equal(w.log.google, 0); assert.equal(w.log.ingest.length, 0);
+  assert.equal((await call(w, { action: 'plan', city: 'Ankara', sectors: 'kuaför' })).status, 403);
 });
 
 test('GET reddedilir', async () => { assert.equal((await call(world(), null, { method: 'GET' })).status, 405); });

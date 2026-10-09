@@ -15,16 +15,16 @@
     color-scheme:light dark;
     --bg:#f5f6fb; --card:#fff; --card2:#f3f4fa; --ink:#12121c; --mute:#5f6275; --line:#e4e6f0;
     --brand:#4f46e5; --brand2:#7c3aed; --brand-text:#4338ca; --on-brand:#fff;
-    --wa:#15803d; --ok:#166534; --warn:#92400e; --bad:#991b1b;
-    --ok-bg:rgba(21,128,61,.12); --warn-bg:rgba(180,83,9,.12); --bad-bg:rgba(185,28,28,.10); --info-bg:rgba(79,70,229,.10); --neutral-bg:rgba(95,98,117,.12);
+    --wa:#15803d; --ok:#166534; --warn:#92400e; --bad:#991b1b; --violet:#5b21b6;
+    --ok-bg:rgba(21,128,61,.12); --warn-bg:rgba(180,83,9,.12); --bad-bg:rgba(185,28,28,.10); --info-bg:rgba(79,70,229,.10); --neutral-bg:rgba(95,98,117,.12); --violet-bg:rgba(124,58,237,.12);
     --shadow:0 1px 2px rgba(18,18,28,.04),0 8px 28px rgba(18,18,28,.07);
     --nav-bg:rgba(255,255,255,.82); --ring:rgba(79,70,229,.35);
     --glow1:rgba(124,58,237,.10); --glow2:rgba(79,70,229,.10);
   }
   @media (prefers-color-scheme:dark){:root{
     --bg:#0c0c12; --card:#16161f; --card2:#1e1e2a; --ink:#f2f2f8; --mute:#a3a6b8; --line:#2a2a38;
-    --brand-text:#a9a4ff; --wa:#15803d; --ok:#4ade80; --warn:#fbbf24; --bad:#f87171;
-    --ok-bg:rgba(74,222,128,.14); --warn-bg:rgba(251,191,36,.14); --bad-bg:rgba(248,113,113,.14); --info-bg:rgba(169,164,255,.16); --neutral-bg:rgba(163,166,184,.16);
+    --brand-text:#a9a4ff; --wa:#15803d; --ok:#4ade80; --warn:#fbbf24; --bad:#f87171; --violet:#c4b5fd;
+    --ok-bg:rgba(74,222,128,.14); --warn-bg:rgba(251,191,36,.14); --bad-bg:rgba(248,113,113,.14); --info-bg:rgba(169,164,255,.16); --neutral-bg:rgba(163,166,184,.16); --violet-bg:rgba(196,181,253,.16);
     --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);
     --nav-bg:rgba(22,22,31,.82); --ring:rgba(169,164,255,.45);
     --glow1:rgba(124,58,237,.18); --glow2:rgba(79,70,229,.16);
@@ -45,8 +45,9 @@
   /* ---------- üst bar ---------- */
   .top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
   .brand{display:flex;align-items:center;gap:10px;font-weight:750;font-size:21px;letter-spacing:-.02em}
-  .logo{width:34px;height:34px;border-radius:11px;background:linear-gradient(135deg,var(--brand),var(--brand2));display:grid;place-items:center;box-shadow:0 6px 16px rgba(79,70,229,.35)}
+  .logo{width:34px;height:34px;border-radius:11px;background:linear-gradient(135deg,var(--brand),var(--brand2));display:grid;place-items:center;box-shadow:0 6px 16px rgba(79,70,229,.35);flex:none}
   .logo svg{width:18px;height:18px;stroke:#fff;fill:none;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+  .rolebadge{font-size:11.5px;font-weight:650;padding:2px 9px;border-radius:999px;background:var(--info-bg);color:var(--brand-text);letter-spacing:.01em}
   .stats{display:flex;align-items:center;gap:10px}
   .goal{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:6px 14px 6px 8px;box-shadow:var(--shadow)}
   .ring{width:42px;height:42px;transform:rotate(-90deg);flex:none}
@@ -93,7 +94,7 @@
   .btn.primary{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;box-shadow:0 8px 20px rgba(79,70,229,.28)}
   .btn.wa{background:var(--wa);color:#fff}
   .btn.dark{background:var(--ink);color:var(--bg)}
-  .btn.block{width:100%}
+  .btn.block{width:100%} .btn.sm{min-height:38px;padding:8px 14px;font-size:14px}
   .btn.pos{background:var(--ok-bg);color:var(--ok)} .btn.neg{background:var(--bad-bg);color:var(--bad)} .btn.amber{background:var(--warn-bg);color:var(--warn)}
   .link{background:none;border:0;padding:0;color:var(--brand-text);font-size:14px;font-weight:550}
   .link:hover{text-decoration:underline}
@@ -103,7 +104,12 @@
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   .space{height:14px}
 
-  /* ---------- işletme kartı ---------- */
+  /* ---------- liste (WhatsApp / Arama / Takip) ---------- */
+  .seg{display:flex;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:4px;margin:0 0 12px}
+  .seg button{flex:1;border:0;background:none;border-radius:12px;padding:9px 6px;font-size:14px;font-weight:620;color:var(--mute);display:flex;align-items:center;justify-content:center;gap:6px}
+  .seg button.on{background:var(--info-bg);color:var(--brand-text)}
+  .seg .n{font-size:11.5px;min-width:20px;height:20px;border-radius:999px;background:var(--neutral-bg);display:grid;place-items:center;padding:0 6px}
+  .seg .n:empty{display:none} .seg button.on .n{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff}
   .filters{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 14px}
   .filters select{background-color:var(--card);border-color:var(--line);font-size:14px;padding:10px 34px 10px 14px}
   .biz-top{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}
@@ -138,7 +144,6 @@
   details.close .grid2{margin-top:2px}
   #cbBox{margin-top:12px;padding:14px;border-radius:18px;background:var(--card2)}
   .skip{display:block;margin:16px auto 0;color:var(--mute)}
-
   .empty,.errbox{text-align:center;padding:46px 22px}
   .empty svg{width:76px;height:76px;margin:0 auto 14px;display:block}
   .empty h3,.errbox h3{font-size:19px;letter-spacing:-.01em;margin-bottom:6px}
@@ -147,24 +152,66 @@
   .skel .l{height:16px;border-radius:8px;background:linear-gradient(90deg,var(--card2),var(--line),var(--card2));background-size:200% 100%;animation:sh 1.2s linear infinite;margin-bottom:12px}
   @keyframes sh{to{background-position:-200% 0}}
 
-  /* ---------- geçmiş ---------- */
+  /* ---------- geçmiş / listeler ---------- */
   .list{list-style:none;margin:0;padding:0}
   .list li{padding:14px 4px;border-bottom:1px solid var(--line);display:grid;grid-template-columns:1fr auto;gap:2px 12px}
   .list li:last-child{border-bottom:0}
   .list .t{font-weight:620;overflow-wrap:anywhere} .list .s{font-size:13px;color:var(--mute)}
   .list .note{grid-column:1/-1;font-size:13.5px;color:var(--mute);margin-top:4px}
   .pill{font-size:12px;font-weight:650;padding:3px 10px;border-radius:999px;white-space:nowrap;align-self:start}
-  .pill.ok{background:var(--ok-bg);color:var(--ok)} .pill.warn{background:var(--warn-bg);color:var(--warn)} .pill.bad{background:var(--bad-bg);color:var(--bad)} .pill.info{background:var(--info-bg);color:var(--brand-text)} .pill.neutral{background:var(--neutral-bg);color:var(--mute)}
+  .pill.ok{background:var(--ok-bg);color:var(--ok)} .pill.warn{background:var(--warn-bg);color:var(--warn)} .pill.bad{background:var(--bad-bg);color:var(--bad)} .pill.info{background:var(--info-bg);color:var(--brand-text)} .pill.neutral{background:var(--neutral-bg);color:var(--mute)} .pill.violet{background:var(--violet-bg);color:var(--violet)}
   .section-t{font-size:13px;font-weight:650;color:var(--mute);margin:20px 4px 8px;text-transform:uppercase;letter-spacing:.06em}
   .list.compact li{padding:11px 4px}
+
+  /* ---------- müşteriler ---------- */
+  .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:18px}
+  .tile{background:var(--card2);border-radius:16px;padding:12px 14px} .tile b{display:block;font-size:22px;letter-spacing:-.02em} .tile small{font-size:12px;color:var(--mute)}
+  .cust-head{display:flex;gap:8px;margin:0 0 12px}
+  .cust-head input{background:var(--card);border-color:var(--line)}
+  .stagebar{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 10px;margin:0 -2px 6px;scrollbar-width:none}
+  .stagebar::-webkit-scrollbar{display:none}
+  .stagebar .chip{white-space:nowrap;flex:none;padding:7px 14px;font-size:13.5px}
+  .stagebar .chip b{margin-left:5px;font-weight:700}
+  .cust{display:block;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:22px;padding:18px 18px 16px;margin:0 0 10px;box-shadow:var(--shadow);animation:rise .25s ease both}
+  .cust:hover{border-color:var(--brand)}
+  .cust-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+  .cust-name{font-size:17.5px;font-weight:700;letter-spacing:-.015em;overflow-wrap:anywhere}
+  .cust-sub{font-size:13px;color:var(--mute);margin-top:2px}
+  .dots{display:flex;gap:4px;margin:12px 0 10px} .dots i{flex:1;height:5px;border-radius:99px;background:var(--line)} .dots i.f{background:linear-gradient(90deg,var(--brand),var(--brand2))}
+  .cust-meta{display:flex;gap:6px 14px;flex-wrap:wrap;font-size:13px;color:var(--mute)} .cust-meta b{color:var(--ink);font-weight:650}
+  .cust-note{font-size:13.5px;color:var(--mute);margin-top:8px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:pre-line}
+  dialog.sheet{width:min(96vw,640px);max-width:96vw;max-height:92vh;padding:0;overflow:auto;border-radius:26px}
+  .sheet-in{padding:24px}
+  .sheet-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:6px}
+  .sheet-top h2{font-size:23px;letter-spacing:-.02em;overflow-wrap:anywhere}
+  .stagepick{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .stagepick .chip{padding:7px 13px;font-size:13.5px}
+  .stagepick .chip.cur{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;border-color:transparent}
+  #stageBox{margin-top:10px;padding:14px;border-radius:18px;background:var(--card2)}
+  .fgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .fgrid .wide{grid-column:1/-1}
+  .tl{list-style:none;margin:10px 0 0;padding:0 0 0 18px;border-left:2px solid var(--line)}
+  .tl li{position:relative;padding:0 0 14px 14px}
+  .tl li::before{content:"";position:absolute;left:-24px;top:5px;width:10px;height:10px;border-radius:50%;background:var(--card);border:2px solid var(--mute)}
+  .tl li.stage::before{border-color:var(--brand);background:var(--brand)} .tl li.created::before{border-color:var(--ok);background:var(--ok)} .tl li.edit::before{border-style:dashed}
+  .tl .b{white-space:pre-line;overflow-wrap:anywhere} .tl .m{font-size:12px;color:var(--mute);margin-top:2px}
+  .tl li.edit .b{color:var(--mute);font-size:13.5px}
+
+  /* ---------- ekip ---------- */
+  .trow{display:grid;grid-template-columns:1fr;gap:8px;padding:14px 2px;border-bottom:1px solid var(--line)} .trow:last-child{border-bottom:0}
+  .trow .who{font-weight:650;overflow-wrap:anywhere} .trow .meta2{font-size:12.5px;color:var(--mute)}
+  .trow .ctrl{display:grid;grid-template-columns:1fr 1fr auto;gap:8px}
+  @media (max-width:480px){.trow .ctrl{grid-template-columns:1fr 1fr}.trow .ctrl .btn{grid-column:1/-1}}
+  .legend{display:grid;gap:8px;font-size:14px}
+  .legend div{display:flex;gap:10px;align-items:baseline} .legend .pill{flex:none;min-width:84px;text-align:center}
+  .soon{display:flex;gap:14px;align-items:center;margin-top:12px;padding:16px;border-radius:20px;border:1.5px dashed var(--line)}
+  .soon .logo{opacity:.85}
 
   /* ---------- tarama ---------- */
   .scan-h{display:flex;gap:14px;align-items:center;margin-bottom:18px}
   .scan-h .logo{width:44px;height:44px;border-radius:14px} .scan-h h2{font-size:20px;letter-spacing:-.02em} .scan-h p{font-size:13.5px;color:var(--mute)}
   .chk{display:flex;gap:10px;align-items:center;font-size:14px;color:var(--mute);margin:16px 0 0;font-weight:500;cursor:pointer}
   .chk input{width:18px;height:18px;padding:0;accent-color:var(--brand)}
-  .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:18px}
-  .tile{background:var(--card2);border-radius:16px;padding:12px 14px} .tile b{display:block;font-size:22px;letter-spacing:-.02em} .tile small{font-size:12px;color:var(--mute)}
   .meter{height:6px;border-radius:99px;background:var(--line);margin-top:8px;overflow:hidden} .meter i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--brand2));border-radius:99px}
   .plan{margin-top:14px}
   .plan .u{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 2px;border-bottom:1px solid var(--line);font-size:14.5px}
@@ -180,20 +227,21 @@
   .log div{padding:9px 2px;border-bottom:1px solid var(--line)} .log div:last-child{border-bottom:0}
   .log .sum{font-weight:700;font-size:15px}
 
-  /* ---------- giriş ---------- */
-  #login{max-width:400px;margin:9vh auto 0;text-align:center;padding:34px 28px}
-  #login .logo{width:56px;height:56px;border-radius:18px;margin:0 auto 18px} #login .logo svg{width:28px;height:28px}
-  #login h1{font-size:28px;letter-spacing:-.03em} #login .sub{color:var(--mute);margin:6px 0 26px}
+  /* ---------- giriş ve durum ekranları ---------- */
+  #login,#gate{max-width:420px;margin:9vh auto 0;text-align:center;padding:34px 28px}
+  #login .logo,#gate .logo{width:56px;height:56px;border-radius:18px;margin:0 auto 18px} #login .logo svg,#gate .logo svg{width:28px;height:28px}
+  #login h1,#gate h1{font-size:26px;letter-spacing:-.03em} #login .sub,#gate .sub{color:var(--mute);margin:8px 0 22px}
   #login form{text-align:left} #loginErr{min-height:20px;margin-top:12px;font-size:14px;text-align:center}
 
   /* ---------- diyalog & bildirim ---------- */
   dialog{border:0;border-radius:24px;padding:26px;max-width:min(92vw,400px);background:var(--card);color:var(--ink);box-shadow:0 30px 80px rgba(0,0,0,.35)}
   dialog::backdrop{background:rgba(10,10,20,.55);backdrop-filter:blur(4px)}
-  dialog h3{font-size:19px;letter-spacing:-.01em} dialog p{color:var(--mute);margin:8px 0 22px;font-size:14.5px}
+  dialog h3{font-size:19px;letter-spacing:-.01em} dialog p.d{color:var(--mute);margin:8px 0 22px;font-size:14.5px}
   #toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom));transform:translate(-50%,10px);max-width:min(92vw,520px);background:var(--ink);color:var(--bg);font-size:14.5px;font-weight:550;padding:12px 20px;border-radius:16px;opacity:0;transition:.25s;pointer-events:none;z-index:50;text-align:center;box-shadow:var(--shadow)}
   #toast.on{opacity:1;transform:translate(-50%,0)}
   @media (min-width:860px){#toast{bottom:28px}}
-  @media (max-width:480px){.name{font-size:24px}.phone{font-size:28px}.card{padding:20px;border-radius:24px}.goal .mini{display:none}.tiles{gap:6px}.tile{padding:10px}}
+  @media (max-width:600px){dialog.sheet{margin:auto auto 0;border-bottom-left-radius:0;border-bottom-right-radius:0;max-height:94vh}}
+  @media (max-width:480px){.name{font-size:24px}.phone{font-size:28px}.card{padding:20px;border-radius:24px}.goal .mini{display:none}.tiles{gap:6px}.tile{padding:10px}.sheet-in{padding:20px}}
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -205,7 +253,7 @@
   <!-- Giriş -->
   <div id="login" class="card hide">
     <div class="logo"><svg viewBox="0 0 24 24"><path d="M4 5l8 14 8-14"/></svg></div>
-    <h1>Vitrin</h1><p class="sub">Müşteri bulma ve arama paneli</p>
+    <h1>Vitrin</h1><p class="sub">Müşteri bulma, satış ve proje paneli</p>
     <form id="loginForm">
       <label for="email">E-posta</label><input id="email" type="email" autocomplete="username" required>
       <div class="space"></div>
@@ -216,12 +264,19 @@
     </form>
   </div>
 
+  <!-- Yetki / kurulum durum ekranı -->
+  <div id="gate" class="card hide" role="alert">
+    <div class="logo"><svg viewBox="0 0 24 24"><path d="M4 5l8 14 8-14"/></svg></div>
+    <h1 id="gateTitle"></h1><p class="sub" id="gateText"></p>
+    <div class="row2"><button class="btn" id="gateRetry">Tekrar dene</button><button class="btn" id="gateOut">Çıkış yap</button></div>
+  </div>
+
   <!-- Uygulama -->
   <div id="app" class="hide">
     <header class="top">
-      <div class="brand"><div class="logo"><svg viewBox="0 0 24 24"><path d="M4 5l8 14 8-14"/></svg></div>Vitrin</div>
+      <div class="brand"><div class="logo"><svg viewBox="0 0 24 24"><path d="M4 5l8 14 8-14"/></svg></div>Vitrin <span class="rolebadge" id="roleBadge"></span></div>
       <div class="stats">
-        <div class="goal" title="Bu hafta yapılan temas / hedef">
+        <div class="goal hide" id="goalBox" title="Bu hafta yapılan temas / hedef">
           <svg class="ring" viewBox="0 0 48 48" aria-hidden="true"><circle class="bg" cx="24" cy="24" r="20"/><circle class="fg" id="ringFg" cx="24" cy="24" r="20" stroke-dasharray="125.66" stroke-dashoffset="125.66"/></svg>
           <div><b><span id="weekCount">0</span>/<span id="weekGoal">100</span></b><small>bu hafta</small></div>
           <div class="mini"><span>Bugün <b id="todayCount">0</b></span><span class="wal">WhatsApp <b id="waToday">0</b>/<span id="waLimit">25</span></span></div>
@@ -231,15 +286,20 @@
     </header>
 
     <nav id="tabs" aria-label="Bölümler">
-      <button data-tab="whatsapp" aria-current="page"><span class="ico"><svg class="i" viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5z"/></svg></span>WhatsApp<span class="n" id="n_whatsapp"></span></button>
-      <button data-tab="call"><span class="ico"><svg class="i" viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></svg></span>Arama<span class="n" id="n_call"></span></button>
-      <button data-tab="followup"><span class="ico"><svg class="i" viewBox="0 0 24 24"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></span>Takip<span class="n" id="n_followup"></span></button>
-      <button data-tab="scan"><span class="ico"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/><path d="M11 8v6M8 11h6"/></svg></span>Tara</button>
-      <button data-tab="hist"><span class="ico"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>Geçmiş</button>
+      <button data-nav="lists" aria-current="page"><span class="ico"><svg class="i" viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5z"/></svg></span>Liste<span class="n" id="n_lists"></span></button>
+      <button data-nav="customers"><span class="ico"><svg class="i" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.9"/><path d="M16 3.1a4 4 0 0 1 0 7.8"/></svg></span>Müşteriler<span class="n" id="n_customers"></span></button>
+      <button data-nav="scan"><span class="ico"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/><path d="M11 8v6M8 11h6"/></svg></span>Tara</button>
+      <button data-nav="hist"><span class="ico"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>Geçmiş</button>
+      <button data-nav="team"><span class="ico"><svg class="i" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>Ekip</button>
     </nav>
 
     <!-- Liste görünümü (WhatsApp / Arama / Takip) -->
     <section id="callView">
+      <div class="seg" id="listSeg">
+        <button data-tab="whatsapp" class="on">WhatsApp<span class="n" id="n_whatsapp"></span></button>
+        <button data-tab="call">Arama<span class="n" id="n_call"></span></button>
+        <button data-tab="followup">Takip<span class="n" id="n_followup"></span></button>
+      </div>
       <div class="filters">
         <select id="cityFilter" aria-label="Şehir filtresi"><option value="">Tüm şehirler</option></select>
         <select id="sectorFilter" aria-label="Sektör filtresi"><option value="">Tüm sektörler</option></select>
@@ -324,6 +384,21 @@
       </article>
     </section>
 
+    <!-- Müşteriler -->
+    <section id="customersView" class="hide">
+      <div class="cust-head">
+        <input id="custSearch" type="search" placeholder="Müşteri ara…" aria-label="Müşterilerde ara">
+        <button class="btn primary" id="custAdd" style="flex:0 0 auto">+ Ekle</button>
+      </div>
+      <div class="stagebar" id="stageBar" role="group" aria-label="Aşama filtresi"></div>
+      <div class="tiles" id="custTiles" style="margin:4px 0 16px"></div>
+      <div id="custList"></div>
+      <div id="custEmpty" class="card empty hide">
+        <svg viewBox="0 0 80 80" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="muted"><circle cx="40" cy="30" r="12" opacity=".4"/><path d="M16 66c2-14 12-20 24-20s22 6 24 20" opacity=".4"/><path d="M52 18l6 6 10-12" stroke="url(#grad)" stroke-width="4"/></svg>
+        <h3 id="custEmptyT">Henüz müşteri yok</h3><p id="custEmptyP">Listede "Satış oldu" dediğin işletmeler burada otomatik görünür. Elle de ekleyebilirsin.</p>
+      </div>
+    </section>
+
     <!-- Geçmiş -->
     <section id="histView" class="hide">
       <input id="histSearch" type="search" placeholder="İşletme adı, not veya telefon ara…" aria-label="Geçmişte ara" style="margin-bottom:12px;background:var(--card);border-color:var(--line)">
@@ -367,12 +442,84 @@
       <div class="section-t">Son taramalar</div>
       <div class="card" style="padding:6px 20px"><ul class="list compact" id="scHist"></ul></div>
     </section>
+
+    <!-- Ekip (yönetici) -->
+    <section id="teamView" class="hide">
+      <div class="card">
+        <div class="scan-h"><div class="logo"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+          <div><h2>Ekip ve yetkiler</h2><p>Kim neyi görür burada belirlenir. Rolü olmayan kimse hiçbir şey göremez.</p></div></div>
+        <div id="teamList"></div>
+        <p class="hint">Yeni kişi eklemek için Supabase &gt; Authentication &gt; Users &gt; Add user. Giriş yaptıktan sonra burada listelenir, rol vermeniz yeter.</p>
+      </div>
+      <div class="section-t">Roller</div>
+      <div class="card">
+        <div class="legend">
+          <div><span class="pill info">Yönetici</span><span>Her şey: listeler, tarama, müşteriler, ekip ve (yakında) abonelikler.</span></div>
+          <div><span class="pill ok">Satış</span><span>Listeler, tarama ve müşteriler; ekip ve abonelikleri göremez.</span></div>
+          <div><span class="pill violet">Tasarımcı</span><span>Yalnızca müşteriler: aşama, not, tutar ve alan adı. Satış listelerini göremez.</span></div>
+        </div>
+        <div class="soon"><div class="logo"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/></svg></div>
+          <div><b>Abonelikler (yakında)</b><p class="muted" style="font-size:13.5px">Claude, GitHub gibi araç aboneliklerinin yenileme tarihleri ve maliyetleri. Yalnızca yöneticiler görecek.</p></div></div>
+      </div>
+    </section>
   </div>
 </div>
 
+<!-- Müşteri detayı -->
+<dialog id="cdlg" class="sheet" aria-labelledby="cName">
+  <div class="sheet-in">
+    <div class="sheet-top">
+      <div><h2 id="cName"></h2><p class="muted" id="cSub" style="font-size:14px"></p></div>
+      <button class="iconbtn" id="cClose" aria-label="Kapat"><svg class="i" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="row2" id="cContact" style="margin:12px 0 4px"><a class="btn dark sm" id="cCall">Ara</a><a class="btn wa sm" id="cWa" target="_blank" rel="noopener">WhatsApp</a></div>
+
+    <div class="section-t" style="margin-top:18px">Aşama</div>
+    <div class="stagepick" id="cStages"></div>
+    <div id="stageBox" class="hide">
+      <label for="stageNote" id="stageLbl">Aşama notu (isteğe bağlı)</label>
+      <input id="stageNote" placeholder="Örn. logo bekleniyor, taslak yarın">
+      <div class="row2" style="margin-top:8px"><button class="btn" id="stageCancel">Vazgeç</button><button class="btn primary" id="stageSave">Aşamayı değiştir</button></div>
+    </div>
+
+    <div class="section-t">Bilgiler</div>
+    <div class="fgrid">
+      <div><label for="fAmount">Tutar (TL)</label><input id="fAmount" inputmode="decimal" placeholder="7500"></div>
+      <div><label for="fDomain">Alan adı</label><input id="fDomain" placeholder="ornek.com" autocapitalize="off"></div>
+      <div><label for="fNext">Sıradaki adım</label><input id="fNext" placeholder="Logo iste"></div>
+      <div><label for="fNextAt">Adım tarihi</label><input id="fNextAt" type="date"></div>
+      <div class="wide"><button class="btn block sm" id="fSave">Bilgileri kaydet</button></div>
+    </div>
+
+    <div class="section-t">Notlar ve geçmiş</div>
+    <textarea id="nNote" aria-label="Yeni not" placeholder="Not ekle: görüşme, teslim, ödeme, revize…"></textarea>
+    <div class="chips" id="nChips"><button type="button" class="chip">İçerik geldi</button><button type="button" class="chip">Logo geldi</button><button type="button" class="chip">Taslak gönderildi</button><button type="button" class="chip">Revize istendi</button><button type="button" class="chip">Ödeme alındı</button></div>
+    <button class="btn primary block sm" id="nAdd" style="margin-top:10px">Notu ekle</button>
+    <ul class="tl" id="cTimeline"></ul>
+  </div>
+</dialog>
+
+<!-- Elle müşteri ekle -->
+<dialog id="adlg" aria-labelledby="aTitle">
+  <form id="aForm">
+    <h3 id="aTitle">Müşteri ekle</h3><p class="d">Listeden gelmeyen (tanıdık, referans…) müşteriyi elle ekle.</p>
+    <label for="aName">Ad</label><input id="aName" required minlength="2" maxlength="120">
+    <div class="space"></div>
+    <div class="fgrid">
+      <div><label for="aPhone">Telefon</label><input id="aPhone" inputmode="tel"></div>
+      <div><label for="aAmount">Tutar (TL)</label><input id="aAmount" inputmode="decimal"></div>
+      <div><label for="aCity">Şehir</label><input id="aCity"></div>
+      <div><label for="aSector">Sektör</label><input id="aSector"></div>
+    </div>
+    <div class="space"></div>
+    <label for="aNote">Not</label><input id="aNote" placeholder="Nasıl geldi?">
+    <div class="row2" style="margin-top:18px"><button type="button" class="btn" id="aCancel">Vazgeç</button><button class="btn primary">Ekle</button></div>
+  </form>
+</dialog>
+
 <dialog id="dlg" aria-labelledby="dlgTitle">
   <form method="dialog">
-    <h3 id="dlgTitle"></h3><p id="dlgText"></p>
+    <h3 id="dlgTitle"></h3><p class="d" id="dlgText"></p>
     <div class="row2"><button class="btn" value="cancel">Vazgeç</button><button class="btn neg" value="ok" id="dlgOk">Evet</button></div>
   </form>
 </dialog>
@@ -393,14 +540,20 @@ const OUTCOME_TR = {wa_sent:'WhatsApp gönderildi', no_answer:'Açmadı', callba
 const OUTCOME_CLS = {wa_sent:'ok', no_answer:'warn', callback:'info', interested:'ok', won:'ok', rejected:'bad', do_not_contact:'bad', wrong_number:'neutral', closed_business:'neutral'};
 const WEB_TR = {none:'Web sitesi yok', social_only:'Sadece sosyal medya'};
 const LISTS = ['whatsapp','call','followup'];
-const LIST_TR = {whatsapp:'WhatsApp', call:'Arama', followup:'Takip'};
+const ROLE_TR = {admin:'Yönetici', sales:'Satış', designer:'Tasarımcı', none:'Yetkisiz'};
 let current = null, skipped = new Set(), busy = false, waTodayCount = 0, list = 'whatsapp', seq = 0, counts = {};
+let access = null, myId = null;
+const can = p => !!(access && access.perms.has(p));
 
 let toastTimer;
 function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('on'),2600); }
-function fmt(d){ return d ? new Date(d).toLocaleString('tr-TR',{dateStyle:'short',timeStyle:'short'}) : ''; }
+const fmt = d => d ? new Date(d).toLocaleString('tr-TR',{dateStyle:'short',timeStyle:'short'}) : '';
+const fmtDay = d => d ? new Date(d).toLocaleDateString('tr-TR',{day:'numeric',month:'short'}) : '';
+const TRY = new Intl.NumberFormat('tr-TR',{style:'currency',currency:'TRY',maximumFractionDigits:0});
 const fail = (e)=>{ console.error(e); toast('Hata: '+(e && e.message ? e.message : e)); };
 function el(tag, cls, text){ const e=document.createElement(tag); if(cls) e.className=cls; if(text!=null) e.textContent=text; return e; }
+const trLower = s => (s||'').replace(/İ/g,'i').replace(/I/g,'ı').toLowerCase();
+function daysAgo(d){ const n=Math.floor((Date.now()-new Date(d))/86400000); return n<=0?'bugün':n===1?'dün':n+' gün önce'; }
 const STAR = '<svg viewBox="0 0 24 24"><path d="M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z" fill="currentColor"/></svg>';
 function confirmDlg(title, text, okLabel){
   return new Promise(res=>{
@@ -409,16 +562,50 @@ function confirmDlg(title, text, okLabel){
   });
 }
 
-// ---- Oturum ----
+// ---- Oturum ve yetki ----
 async function init(){
   $('weekGoal').textContent = WEEKLY_GOAL; $('waLimit').textContent = WA_DAILY_LIMIT;
   const { data:{ session } } = await sb.auth.getSession();
   session ? showApp() : showLogin();
 }
-function showLogin(){ current=null; $('login').classList.remove('hide'); $('app').classList.add('hide'); $('password').value=''; document.title='Vitrin'; }
+function hideAll(){ ['login','gate','app'].forEach(id=>$(id).classList.add('hide')); }
+function showLogin(){ current=null; access=null; hideAll(); $('login').classList.remove('hide'); $('password').value=''; document.title='Vitrin'; }
+function showGate(title, text, retry){ hideAll(); $('gate').classList.remove('hide'); $('gateTitle').textContent=title; $('gateText').textContent=text; $('gateRetry').classList.toggle('hide',!retry); }
+$('gateRetry').onclick = ()=>showApp();
+$('gateOut').onclick = async ()=>{ await sb.auth.signOut(); showLogin(); };
+
+async function loadAccess(){
+  const { data, error } = await sb.rpc('my_access');
+  if(error){
+    const missing = error.code==='PGRST202' || /my_access/.test(error.message||'');
+    showGate(missing ? 'Veritabanı güncellemesi gerekli' : 'Yüklenemedi',
+      missing ? 'Supabase > SQL Editor\'de supabase/schema.sql dosyasının güncel halini çalıştırın, sonra tekrar deneyin.' : (error.message || 'Bağlantıyı kontrol edip tekrar deneyin.'), true);
+    return false;
+  }
+  const a=(data||[])[0] || {};
+  access = { role:a.role||'none', perms:new Set(a.perms||[]), name:a.display_name||'' };
+  return true;
+}
+const NAV_PERM = {lists:'leads', customers:'customers', scan:'scan', hist:'leads', team:'team'};
+const NAV_OF = {whatsapp:'lists', call:'lists', followup:'lists', customers:'customers', scan:'scan', hist:'hist', team:'team'};
+const VIEW_OF = {whatsapp:'callView', call:'callView', followup:'callView', customers:'customersView', scan:'scanView', hist:'histView', team:'teamView'};
+const navBtns = () => [...document.querySelectorAll('#tabs [data-nav]')];
+
 async function showApp(){
-  $('login').classList.add('hide'); $('app').classList.remove('hide');
-  await Promise.all([loadFilters(), refreshCounts(), loadNext()]);
+  hideAll();
+  const { data:{ session } } = await sb.auth.getSession(); myId = session ? session.user.id : null;
+  if(!await loadAccess()) return;
+  if(!access.perms.size){ showGate('Hesabınıza henüz yetki verilmedi', 'Yöneticinizden rol vermesini isteyin, sonra tekrar deneyin.', true); return; }
+  $('app').classList.remove('hide');
+  navBtns().forEach(b=>b.classList.toggle('hide', !can(NAV_PERM[b.dataset.nav])));
+  $('tabs').classList.toggle('hide', navBtns().filter(b=>!b.classList.contains('hide')).length < 2);
+  $('goalBox').classList.toggle('hide', !can('leads'));
+  $('emptyScan').classList.toggle('hide', !can('scan'));
+  $('roleBadge').textContent = ROLE_TR[access.role] || '';
+  const who = 'Çıkış yap' + (access.name ? ' ('+access.name+')' : ''); $('logout').title = who; $('logout').setAttribute('aria-label', who);
+  const first = navBtns().find(b=>!b.classList.contains('hide')).dataset.nav;
+  if(can('customers')) loadCustomerBadge();
+  await tab(first==='lists' ? list : first);
 }
 $('loginForm').addEventListener('submit', async e=>{
   e.preventDefault(); $('loginErr').textContent='';
@@ -441,6 +628,7 @@ $('cityFilter').onchange = $('sectorFilter').onchange = async ()=>{ await releas
 // ---- Sayaçlar ----
 const RING_LEN = 2*Math.PI*20;
 async function refreshCounts(){
+  if(!can('leads')) return;
   const [st, ct] = await Promise.all([
     sb.rpc('stats'),
     sb.rpc('list_counts',{ p_city:$('cityFilter').value||null, p_sector:$('sectorFilter').value||null })
@@ -456,6 +644,7 @@ async function refreshCounts(){
     counts = Object.fromEntries((ct.data||[]).map(r=>[r.lst, Number(r.n)]));
     LISTS.forEach(l=>{ $('n_'+l).textContent = counts[l] || ''; });
     const total = LISTS.reduce((a,l)=>a+(counts[l]||0),0);
+    $('n_lists').textContent = total || '';
     document.title = (total ? `(${total}) ` : '') + 'Vitrin';
   }
 }
@@ -549,7 +738,8 @@ async function save(outcome, callbackAt){
       p_note:$('note').value.trim()||null, p_callback_at:callbackAt||null });
   busy = false;
   if(error){ toast('Kaydedilemedi: '+error.message); return; }
-  toast('Kaydedildi: '+OUTCOME_TR[outcome]);
+  toast(outcome==='won' ? 'Satış kaydedildi, Müşteriler sekmesine eklendi' : 'Kaydedildi: '+OUTCOME_TR[outcome]);
+  if(outcome==='won' && can('customers')) loadCustomerBadge();
   await Promise.all([refreshCounts(), loadNext()]);
 }
 function cbDate(kind){
@@ -581,7 +771,7 @@ $('toCallList').onclick = async ()=>{
 
 // Klavye kısayolları (masaüstü): W = WhatsApp'tan yaz, S = atla, N = nota git
 document.addEventListener('keydown',e=>{
-  if(e.metaKey||e.ctrlKey||e.altKey||$('dlg').open||$('callView').classList.contains('hide')||$('biz').classList.contains('hide')) return;
+  if(e.metaKey||e.ctrlKey||e.altKey||document.querySelector('dialog[open]')||$('callView').classList.contains('hide')||$('biz').classList.contains('hide')) return;
   if(/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) return;
   const k=e.key.toLowerCase();
   if(k==='w'){ if(!$('waBtn').disabled) $('waBtn').click(); }
@@ -590,18 +780,23 @@ document.addEventListener('keydown',e=>{
 });
 
 // ---- Sekmeler ----
-const VIEWS = {hist:'histView', scan:'scanView'};
 async function tab(which){
-  document.querySelectorAll('#tabs button').forEach(b=>b.dataset.tab===which ? b.setAttribute('aria-current','page') : b.removeAttribute('aria-current'));
-  const view = VIEWS[which] || 'callView';
-  ['callView','histView','scanView'].forEach(v=>$(v).classList.toggle('hide', v!==view));
+  const nav = NAV_OF[which];
+  if(!nav || !can(NAV_PERM[nav])) return;
+  navBtns().forEach(b=> b.dataset.nav===nav ? b.setAttribute('aria-current','page') : b.removeAttribute('aria-current'));
+  document.querySelectorAll('#listSeg [data-tab]').forEach(b=>b.classList.toggle('on', b.dataset.tab===which));
+  const view = VIEW_OF[which];
+  ['callView','customersView','histView','scanView','teamView'].forEach(v=>$(v).classList.toggle('hide', v!==view));
   await release();
-  if(which==='hist'){ loadHistory(); return; }
-  if(which==='scan'){ loadScanHistory(); return; }
+  if(which==='hist') return loadHistory();
+  if(which==='scan') return loadScanHistory();
+  if(which==='customers') return loadCustomers();
+  if(which==='team') return loadTeam();
   list = which; skipped.clear(); showState('skel');
-  await Promise.all([refreshCounts(), loadNext()]);
+  await Promise.all([loadFilters(), refreshCounts(), loadNext()]);
 }
-document.querySelectorAll('#tabs button').forEach(b=>b.addEventListener('click',()=>tab(b.dataset.tab)));
+navBtns().forEach(b=>b.addEventListener('click',()=>tab(b.dataset.nav==='lists' ? list : b.dataset.nav)));
+document.querySelectorAll('#listSeg [data-tab]').forEach(b=>b.addEventListener('click',()=>tab(b.dataset.tab)));
 
 // ---- Geçmiş ----
 let hTimer; $('histSearch').oninput=()=>{ clearTimeout(hTimer); hTimer=setTimeout(loadHistory,300); };
@@ -620,12 +815,167 @@ async function loadHistory(){
   });
 }
 
+// ---- Müşteriler ----
+const STAGES = [['sale_done','Satış gerçekleşti','Satış','info'],['collecting','Bilgi toplanıyor','Bilgi','warn'],['designing','Site tasarlanıyor','Tasarım','violet'],
+  ['client_review','Müşteri onayında','Onay','warn'],['live','Yayında','Yayında','ok'],['paused','Beklemede','Beklemede','neutral'],['cancelled','İptal','İptal','bad']];
+const STAGE = Object.fromEntries(STAGES.map(s=>[s[0],{label:s[1],short:s[2],cls:s[3]}]));
+const FLOW = ['sale_done','collecting','designing','client_review','live'];
+const IN_WORK = ['sale_done','collecting','designing','client_review'];
+let customers = [], custStage = 'all', custTerm = '', cur = null, pendingStage = null;
+
+async function loadCustomers(){
+  const { data, error } = await sb.from('v_customers').select('*').order('stage_changed_at',{ascending:false}).limit(500);
+  if(error){ fail(error); return; }
+  customers = data || []; renderCustomers(); updateCustomerBadge();
+}
+async function loadCustomerBadge(){
+  const { data } = await sb.from('v_customers').select('id,stage').limit(500);
+  if(data) $('n_customers').textContent = data.filter(c=>IN_WORK.includes(c.stage)).length || '';
+}
+function updateCustomerBadge(){ $('n_customers').textContent = customers.filter(c=>IN_WORK.includes(c.stage)).length || ''; }
+
+function renderCustomers(){
+  $('custAdd').classList.toggle('hide', !can('customers_write'));
+  const bar=$('stageBar'); bar.replaceChildren();
+  const cnt = s => customers.filter(c=>c.stage===s).length;
+  [['all','Tümü',customers.length],...STAGES.map(s=>[s[0],s[2],cnt(s[0])])].forEach(([k,label,n])=>{
+    const b=el('button','chip'+(custStage===k?' on':'')); b.type='button'; b.append(label); b.appendChild(el('b',null,String(n)));
+    b.onclick=()=>{ custStage=k; renderCustomers(); }; bar.appendChild(b); });
+  const live = customers.filter(c=>c.stage!=='cancelled');
+  const inProd = customers.filter(c=>['collecting','designing','client_review'].includes(c.stage)).length;
+  const sum = live.reduce((a,c)=>a+Number(c.amount||0),0);
+  const tiles=$('custTiles'); tiles.replaceChildren();
+  [[live.length,'müşteri'],[inProd,'üretimde'],[TRY.format(sum),'toplam tutar']].forEach(([v,l])=>{ const t=el('div','tile'); t.append(el('b',null,String(v)), el('small',null,l)); tiles.appendChild(t); });
+  const term = trLower(custTerm.trim());
+  const rows = customers.filter(c=>(custStage==='all'||c.stage===custStage) &&
+    (!term || trLower([c.name,c.phone,c.domain,c.sector,c.city].filter(Boolean).join(' ')).includes(term)));
+  const box=$('custList'); box.replaceChildren();
+  rows.forEach(c=>{
+    const b=el('button','cust'); b.type='button'; b.dataset.id=c.id;
+    const top=el('div','cust-top'); const l=el('div'); l.append(el('div','cust-name',c.name), el('div','cust-sub',[c.sector,c.city].filter(Boolean).join(' · ')||' '));
+    top.append(l, el('span','pill '+STAGE[c.stage].cls, STAGE[c.stage].label)); b.appendChild(top);
+    const idx = FLOW.indexOf(c.stage), dots=el('div','dots'); FLOW.forEach((_,i)=>dots.appendChild(el('i', idx>=0 && i<=idx ? 'f' : ''))); b.appendChild(dots);
+    const meta=el('div','cust-meta');
+    if(c.amount!=null){ const m=el('span'); m.append('Tutar ', el('b',null,TRY.format(c.amount))); meta.appendChild(m); }
+    if(c.domain) meta.appendChild(el('span',null,c.domain));
+    if(c.next_step){ const over = c.next_step_at && new Date(c.next_step_at) < new Date(new Date().toDateString());
+      const m=el('span',over?'bad':null); m.append('Sıradaki: ', el('b',null,c.next_step+(c.next_step_at?' · '+fmtDay(c.next_step_at):''))); meta.appendChild(m); }
+    meta.appendChild(el('span',null,STAGE[c.stage].short+' · '+daysAgo(c.stage_changed_at)));
+    b.appendChild(meta);
+    if(c.last_note) b.appendChild(el('div','cust-note',c.last_note));
+    b.onclick=()=>openCustomer(c.id); box.appendChild(b);
+  });
+  $('custEmpty').classList.toggle('hide', rows.length>0);
+  $('custEmptyT').textContent = customers.length ? 'Sonuç yok' : 'Henüz müşteri yok';
+  $('custEmptyP').textContent = customers.length ? 'Bu aşamada ya da aramada müşteri bulunamadı.' : 'Listede "Satış oldu" dediğin işletmeler burada otomatik görünür. Elle de ekleyebilirsin.';
+}
+let cTimer; $('custSearch').oninput = e=>{ custTerm=e.target.value; clearTimeout(cTimer); cTimer=setTimeout(renderCustomers,150); };
+
+function toWa(phone){ const d=(phone||'').replace(/\D/g,''); if(/^905\d{9}$/.test(d)) return d; if(/^05\d{9}$/.test(d)) return '9'+d; if(/^5\d{9}$/.test(d)) return '90'+d; return null; }
+const dayStr = d => { const x=new Date(d); return new Date(x.getTime()-x.getTimezoneOffset()*60000).toISOString().slice(0,10); };
+function fillCustomer(){
+  const c=cur; $('cName').textContent=c.name; $('cSub').textContent=[c.sector,c.city].filter(Boolean).join(' · ');
+  const tel=(c.phone||'').replace(/[^\d+]/g,''); $('cCall').classList.toggle('hide',!tel); $('cCall').href='tel:'+tel;
+  const wa=toWa(c.phone); $('cWa').classList.toggle('hide',!wa); if(wa) $('cWa').href='https://wa.me/'+wa;
+  const sp=$('cStages'); sp.replaceChildren();
+  STAGES.forEach(([k,label])=>{ const b=el('button','chip'+(k===c.stage?' cur':''),label); b.type='button'; b.setAttribute('aria-pressed',String(k===c.stage));
+    b.onclick=()=>{ if(!can('customers_write')) return; if(k===c.stage){ pendingStage=null; $('stageBox').classList.add('hide'); return; }
+      pendingStage=k; $('stageLbl').textContent=`${STAGE[c.stage].label} → ${label}  ·  not (isteğe bağlı)`; $('stageNote').value=''; $('stageBox').classList.remove('hide'); $('stageNote').focus(); };
+    sp.appendChild(b); });
+  $('stageBox').classList.add('hide'); pendingStage=null;
+  $('fAmount').value = c.amount!=null ? String(Number(c.amount)) : ''; $('fDomain').value=c.domain||''; $('fNext').value=c.next_step||'';
+  $('fNextAt').value = c.next_step_at ? dayStr(c.next_step_at) : '';
+  const rw = can('customers_write');
+  ['fAmount','fDomain','fNext','fNextAt','nNote'].forEach(id=>$(id).disabled=!rw); $('fSave').classList.toggle('hide',!rw); $('nAdd').classList.toggle('hide',!rw); $('nChips').classList.toggle('hide',!rw);
+}
+async function loadTimeline(){
+  const ul=$('cTimeline'); const id=cur && cur.id; if(!id) return;
+  const { data, error } = await sb.rpc('customer_timeline',{ p_id:id });
+  if(!cur || cur.id!==id) return; ul.replaceChildren();
+  if(error){ fail(error); return; }
+  (data||[]).forEach(n=>{ const li=el('li',n.kind); li.append(el('div','b',n.body), el('div','m',`${n.author||'Ekip'} · ${fmt(n.created_at)}`)); ul.appendChild(li); });
+}
+async function openCustomer(id){
+  cur = customers.find(c=>c.id===id); if(!cur) return;
+  fillCustomer(); $('nNote').value=''; $('cTimeline').replaceChildren();
+  if(!$('cdlg').open) $('cdlg').showModal(); $('cdlg').scrollTop=0; loadTimeline();
+}
+async function refreshCurrent(){
+  await loadCustomers(); if(cur){ const f=customers.find(c=>c.id===cur.id); if(f){ cur=f; fillCustomer(); } } await loadTimeline();
+}
+$('cClose').onclick = ()=>$('cdlg').close();
+$('cdlg').addEventListener('close',()=>{ cur=null; });
+$('cdlg').addEventListener('click',e=>{ if(e.target===$('cdlg')) $('cdlg').close(); });
+$('stageCancel').onclick = ()=>{ pendingStage=null; $('stageBox').classList.add('hide'); };
+$('stageSave').onclick = async ()=>{
+  if(!cur||!pendingStage||busy) return; busy=true; $('stageSave').disabled=true;
+  const { error } = await sb.rpc('set_customer_stage',{ p_id:cur.id, p_stage:pendingStage, p_note:$('stageNote').value.trim()||null });
+  busy=false; $('stageSave').disabled=false;
+  if(error){ toast('Kaydedilemedi: '+error.message); return; }
+  toast('Aşama güncellendi'); await refreshCurrent();
+};
+$('fSave').onclick = async ()=>{
+  if(!cur||busy) return;
+  const patch = {}, c=cur;
+  const amount=$('fAmount').value.trim().replace(',','.'); if(amount && !/^\d+(\.\d{1,2})?$/.test(amount)){ toast('Tutarı sayı olarak yazın (örn. 7500)'); return; }
+  if(amount !== (c.amount!=null?String(Number(c.amount)):'')) patch.amount = amount;
+  if($('fDomain').value.trim() !== (c.domain||'')) patch.domain = $('fDomain').value.trim();
+  if($('fNext').value.trim() !== (c.next_step||'')) patch.next_step = $('fNext').value.trim();
+  const day=$('fNextAt').value, oldDay = c.next_step_at ? dayStr(c.next_step_at) : '';
+  if(day !== oldDay) patch.next_step_at = day ? new Date(day+'T10:00:00').toISOString() : '';
+  if(!Object.keys(patch).length){ toast('Değişiklik yok'); return; }
+  busy=true; const { error } = await sb.rpc('update_customer',{ p_id:c.id, p_patch:patch }); busy=false;
+  if(error){ toast('Kaydedilemedi: '+error.message); return; }
+  toast('Bilgiler kaydedildi'); await refreshCurrent();
+};
+document.querySelectorAll('#nChips .chip').forEach(b=>b.addEventListener('click',()=>{ const n=$('nNote'); n.value = n.value.trim() ? n.value.trim()+'\n'+b.textContent : b.textContent; }));
+$('nAdd').onclick = async ()=>{
+  if(!cur||busy) return; const body=$('nNote').value.trim(); if(!body){ toast('Önce notu yazın'); return; }
+  busy=true; const { error } = await sb.rpc('add_customer_note',{ p_id:cur.id, p_body:body }); busy=false;
+  if(error){ toast('Kaydedilemedi: '+error.message); return; }
+  $('nNote').value=''; toast('Not eklendi'); await refreshCurrent();
+};
+// elle müşteri ekle
+$('custAdd').onclick = ()=>{ $('aForm').reset(); $('adlg').showModal(); $('aName').focus(); };
+$('aCancel').onclick = ()=>$('adlg').close();
+$('aForm').addEventListener('submit', async e=>{
+  e.preventDefault(); if(busy) return;
+  const amount=$('aAmount').value.trim().replace(',','.'); if(amount && !/^\d+(\.\d{1,2})?$/.test(amount)){ toast('Tutarı sayı olarak yazın (örn. 7500)'); return; }
+  busy=true;
+  const { error } = await sb.rpc('create_customer',{ p_name:$('aName').value, p_phone:$('aPhone').value||null, p_city:$('aCity').value||null, p_sector:$('aSector').value||null, p_amount:amount?Number(amount):null, p_note:$('aNote').value||null });
+  busy=false;
+  if(error){ toast('Eklenemedi: '+error.message); return; }
+  $('adlg').close(); toast('Müşteri eklendi'); custStage='all'; await loadCustomers();
+});
+
+// ---- Ekip (yönetici) ----
+async function loadTeam(){
+  const { data, error } = await sb.rpc('team_list');
+  const box=$('teamList'); box.replaceChildren();
+  if(error){ fail(error); return; }
+  (data||[]).forEach(u=>{
+    const row=el('div','trow'); const who=el('div');
+    who.append(el('div','who', (u.display_name||u.email||'—')+(u.user_id===myId?' (siz)':'')),
+               el('div','meta2', [u.email, u.last_sign_in_at ? 'son giriş '+fmt(u.last_sign_in_at) : 'henüz giriş yapmadı'].filter(Boolean).join(' · ')));
+    const ctrl=el('div','ctrl'); const name=el('input'); name.placeholder='Görünen ad'; name.value=u.display_name||''; name.setAttribute('aria-label','Görünen ad: '+(u.email||''));
+    const sel=el('select'); sel.setAttribute('aria-label','Rol: '+(u.email||''));
+    [['none','Yetkisiz'],['sales','Satış'],['designer','Tasarımcı'],['admin','Yönetici']].forEach(([v,t])=>sel.add(new Option(t,v))); sel.value=u.role;
+    const btn=el('button','btn sm','Kaydet'); btn.type='button';
+    btn.onclick=async ()=>{
+      if(sel.value==='none' && u.role!=='none' && !await confirmDlg('Yetki kaldırılsın mı?', `${u.email} artık hiçbir şeyi göremeyecek.`, 'Evet, kaldır')) return;
+      btn.disabled=true; const { error } = await sb.rpc('set_user_role',{ p_user:u.user_id, p_role:sel.value, p_name:name.value||null }); btn.disabled=false;
+      if(error){ toast('Kaydedilemedi: '+error.message); return; }
+      toast('Yetki güncellendi'); loadTeam();
+    };
+    ctrl.append(name, sel, btn); row.append(who, ctrl); box.appendChild(row);
+  });
+}
+
 // ---- Tarama (Supabase Edge Function: Google anahtarı sunucuda kalır) ----
 const SCAN_URL = SUPABASE_URL + '/functions/v1/scan';
 const SECTOR_SUGGEST = ['kuaför','berber','güzellik salonu','diş hekimi','veteriner','psikolog','avukat','muhasebeci','emlak ofisi','oto servis','çiçekçi','pastane','spor salonu','fotoğrafçı','temizlik şirketi','nakliyat'];
 const PROVINCES = 'Adana,Adıyaman,Afyonkarahisar,Ağrı,Aksaray,Amasya,Ankara,Antalya,Ardahan,Artvin,Aydın,Balıkesir,Bartın,Batman,Bayburt,Bilecik,Bingöl,Bitlis,Bolu,Burdur,Bursa,Çanakkale,Çankırı,Çorum,Denizli,Diyarbakır,Düzce,Edirne,Elazığ,Erzincan,Erzurum,Eskişehir,Gaziantep,Giresun,Gümüşhane,Hakkari,Hatay,Iğdır,Isparta,İstanbul,İzmir,Kahramanmaraş,Karabük,Karaman,Kars,Kastamonu,Kayseri,Kırıkkale,Kırklareli,Kırşehir,Kilis,Kocaeli,Konya,Kütahya,Malatya,Manisa,Mardin,Mersin,Muğla,Muş,Nevşehir,Niğde,Ordu,Osmaniye,Rize,Sakarya,Samsun,Siirt,Sinop,Sivas,Şanlıurfa,Şırnak,Tekirdağ,Tokat,Trabzon,Tunceli,Uşak,Van,Yalova,Yozgat,Zonguldak'.split(',');
 PROVINCES.forEach(p=>$('provinces').appendChild(new Option(p)));
-const trLower = s => s.replace(/İ/g,'i').replace(/I/g,'ı').toLowerCase();
 const sectorList = () => $('scSectors').value.split(',').map(s=>trLower(s.trim())).filter(Boolean);
 function syncSectorChips(){ const cur=sectorList(); document.querySelectorAll('#sectorChips .chip').forEach(c=>c.classList.toggle('on', cur.includes(c.textContent))); }
 SECTOR_SUGGEST.forEach(s=>{ const b=el('button','chip',s); b.type='button'; b.onclick=()=>{

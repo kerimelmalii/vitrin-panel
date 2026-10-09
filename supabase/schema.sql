@@ -101,19 +101,103 @@ create table if not exists public.scan_history (
 );
 create index if not exists scan_history_lookup on public.scan_history (city, district, sector, scanned_at desc);
 
+-- ---------- Roller ve yetkiler ----------
+-- Kullanıcıyı Supabase > Authentication > Users'tan siz eklersiniz; rolünü panelde "Ekip" sekmesinden (yönetici) verirsiniz.
+-- Rolü olmayan kullanıcı hiçbir veriyi göremez.
+create table if not exists public.user_roles (
+  user_id      uuid primary key references auth.users(id) on delete cascade,
+  role         text not null check (role in ('admin','sales','designer')),
+  display_name text,
+  created_at   timestamptz not null default now()
+);
+
+-- Rol -> izin eşlemesi tek yerde. Yeni modül (örn. abonelikler) eklemek = buraya izin eklemek.
+--   leads: satış listeleri/geçmiş · scan: bölge tarama · customers: müşteri panosunu görme · customers_write: aşama/not
+--   team: ekip ve roller · subscriptions: (ileride) abonelik takibi
+create or replace function public.role_perms(r text) returns text[]
+language sql immutable as $$
+  select case r
+    when 'admin'    then array['leads','scan','customers','customers_write','team','subscriptions']
+    when 'sales'    then array['leads','scan','customers','customers_write']
+    when 'designer' then array['customers','customers_write']
+    else array[]::text[] end
+$$;
+
+create or replace function public.has_perm(p text) returns boolean
+language sql stable security definer set search_path = public as $$
+  select coalesce(p = any (public.role_perms((select ur.role from public.user_roles ur where ur.user_id = auth.uid()))), false)
+$$;
+
+-- Mevcut kullanıcılar kilitli kalmasın: rol tablosu boşsa en eski kullanıcı yönetici, diğerleri satış olur
+insert into public.user_roles (user_id, role)
+select u.id, case when row_number() over (order by u.created_at, u.id) = 1 then 'admin' else 'sales' end
+  from auth.users u
+ where not exists (select 1 from public.user_roles)
+on conflict do nothing;
+
+alter table public.user_roles enable row level security;
+drop policy if exists p_own on public.user_roles;
+create policy p_own on public.user_roles for select to authenticated using (user_id = (select auth.uid()));
+revoke all on public.user_roles from anon, authenticated;
+grant select on public.user_roles to authenticated;
+
+-- ---------- Müşteriler (satışı gerçekleşenler) ----------
+create table if not exists public.customers (
+  id               uuid primary key default gen_random_uuid(),
+  business_id      uuid unique references public.businesses(id) on delete set null,
+  name             text not null,
+  phone            text,
+  city             text,
+  sector           text,
+  stage            text not null default 'sale_done',
+  amount           numeric(12,2),
+  domain           text,
+  next_step        text,
+  next_step_at     timestamptz,
+  stage_changed_at timestamptz not null default now(),
+  created_at       timestamptz not null default now(),
+  updated_at       timestamptz not null default now()
+);
+alter table public.customers drop constraint if exists customers_stage_chk;
+alter table public.customers add constraint customers_stage_chk check (stage in
+  ('sale_done','collecting','designing','client_review','live','paused','cancelled'));
+alter table public.customers drop constraint if exists customers_amount_chk;
+alter table public.customers add constraint customers_amount_chk check (amount is null or amount >= 0);
+create index if not exists customers_stage_idx on public.customers (stage, stage_changed_at desc);
+
+create table if not exists public.customer_notes (
+  id          uuid primary key default gen_random_uuid(),
+  customer_id uuid not null references public.customers(id) on delete cascade,
+  user_id     uuid,
+  kind        text not null default 'note' check (kind in ('note','stage','created','edit')),
+  body        text not null,
+  created_at  timestamptz not null default now()
+);
+create index if not exists customer_notes_idx on public.customer_notes (customer_id, created_at desc);
+
+-- Satışı kaydedilmiş ama müşteri kaydı olmayanlar (eski veriler) için müşteri oluştur
+insert into public.customers (business_id, name, phone, city, sector)
+select b.id, b.name, coalesce(b.phone_raw, b.phone_normalized), nullif(b.city, ''), nullif(b.sector, '')
+  from public.businesses b
+ where b.status = 'won' and not exists (select 1 from public.customers c where c.business_id = b.id);
+
 -- ---------- Güvenlik: kayıt kapalı, tarayıcı sadece okur; yazma yalnızca fonksiyonlarla ----------
 alter table public.businesses    enable row level security;
 alter table public.calls         enable row level security;
 alter table public.closed_regions enable row level security;
 alter table public.scan_history  enable row level security;
 
-drop policy if exists p_read on public.businesses;     create policy p_read on public.businesses     for select to authenticated using (true);
-drop policy if exists p_read on public.calls;          create policy p_read on public.calls          for select to authenticated using (true);
-drop policy if exists p_read on public.closed_regions; create policy p_read on public.closed_regions for select to authenticated using (true);
-drop policy if exists p_read on public.scan_history;   create policy p_read on public.scan_history   for select to authenticated using (true);
+drop policy if exists p_read on public.businesses;      create policy p_read on public.businesses      for select to authenticated using ((select public.has_perm('leads')));
+drop policy if exists p_read on public.calls;           create policy p_read on public.calls           for select to authenticated using ((select public.has_perm('leads')));
+drop policy if exists p_read on public.closed_regions;  create policy p_read on public.closed_regions  for select to authenticated using ((select public.has_perm('scan')));
+drop policy if exists p_read on public.scan_history;    create policy p_read on public.scan_history    for select to authenticated using ((select public.has_perm('scan')));
+alter table public.customers      enable row level security;
+alter table public.customer_notes enable row level security;
+drop policy if exists p_read on public.customers;       create policy p_read on public.customers       for select to authenticated using ((select public.has_perm('customers')));
+drop policy if exists p_read on public.customer_notes;  create policy p_read on public.customer_notes  for select to authenticated using ((select public.has_perm('customers')));
 
-revoke all on public.businesses, public.calls, public.closed_regions, public.scan_history from anon, authenticated;
-grant select on public.businesses, public.calls, public.closed_regions, public.scan_history to authenticated;
+revoke all on public.businesses, public.calls, public.closed_regions, public.scan_history, public.customers, public.customer_notes from anon, authenticated;
+grant select on public.businesses, public.calls, public.closed_regions, public.scan_history, public.customers, public.customer_notes to authenticated;
 
 -- ---------- Liste mantığı (tek yerde) ----------
 --  whatsapp : yeni + cep numarası + arama listesine alınmamış
@@ -142,6 +226,16 @@ drop function if exists public.filter_options();
 drop function if exists public.stats();
 drop function if exists public.search_history(text,int);
 drop function if exists public.ingest_businesses(jsonb);
+drop function if exists public.my_access();
+drop function if exists public.team_list();
+drop function if exists public.set_user_role(uuid,text,text);
+drop function if exists public.create_customer(text,text,text,text,numeric,text);
+drop function if exists public.update_customer(uuid,jsonb);
+drop function if exists public.set_customer_stage(uuid,text,text);
+drop function if exists public.add_customer_note(uuid,text);
+drop function if exists public.user_can(uuid,text);
+drop function if exists public.stage_label(text);
+drop function if exists public.customer_timeline(uuid);
 
 create or replace function public.next_business(p_list text, p_city text default null,
                                                 p_sector text default null, p_skip uuid[] default '{}')
@@ -149,7 +243,7 @@ returns setof public.businesses
 language plpgsql security definer set search_path = public as $$
 declare uid uuid := auth.uid(); v public.businesses; cand uuid; tries int := 0;
 begin
-  if uid is null then raise exception 'Giriş gerekli'; end if;
+  if uid is null or not public.has_perm('leads') then raise exception 'Bu işlem için yetkiniz yok'; end if;
   if p_list not in ('whatsapp','call','followup') then raise exception 'Geçersiz liste'; end if;
   loop
     tries := tries + 1;
@@ -179,13 +273,13 @@ end $$;
 create or replace function public.release_business(p_business_id uuid)
 returns void language sql security definer set search_path = public as $$
   update public.businesses set claimed_by = null, claimed_at = null
-   where id = p_business_id and claimed_by = auth.uid();
+   where id = p_business_id and claimed_by = auth.uid() and public.has_perm('leads');
 $$;
 
 create or replace function public.move_to_call_list(p_business_id uuid)
 returns void language plpgsql security definer set search_path = public as $$
 begin
-  if auth.uid() is null then raise exception 'Giriş gerekli'; end if;
+  if not public.has_perm('leads') then raise exception 'Bu işlem için yetkiniz yok'; end if;
   update public.businesses set call_list = true, updated_at = now()
    where id = p_business_id and status = 'new';
 end $$;
@@ -193,9 +287,9 @@ end $$;
 create or replace function public.log_call(p_business_id uuid, p_outcome text,
                                            p_note text default null, p_callback_at timestamptz default null)
 returns void language plpgsql security definer set search_path = public as $$
-declare b public.businesses; new_status text; next_at timestamptz; na int;
+declare b public.businesses; new_status text; next_at timestamptz; na int; cid uuid;
 begin
-  if auth.uid() is null then raise exception 'Giriş gerekli'; end if;
+  if not public.has_perm('leads') then raise exception 'Bu işlem için yetkiniz yok'; end if;
   if p_outcome not in ('wa_sent','no_answer','callback','interested','won','rejected',
                        'do_not_contact','wrong_number','closed_business') then
     raise exception 'Geçersiz sonuç: %', p_outcome;
@@ -226,6 +320,17 @@ begin
      set status = new_status, next_action_at = next_at, no_answer_count = na,
          attempt_count = attempt_count + 1, claimed_by = null, claimed_at = null, updated_at = now()
    where id = p_business_id;
+
+  -- Satış gerçekleştiyse müşteri panosuna otomatik düşer
+  if p_outcome = 'won' then
+    insert into public.customers (business_id, name, phone, city, sector)
+    values (b.id, b.name, coalesce(b.phone_raw, b.phone_normalized), nullif(b.city, ''), nullif(b.sector, ''))
+    on conflict (business_id) do nothing returning id into cid;
+    if cid is not null then
+      insert into public.customer_notes (customer_id, user_id, kind, body)
+      values (cid, auth.uid(), 'created', 'Satış kaydedildi' || coalesce(E'\n' || nullif(btrim(p_note), ''), ''));
+    end if;
+  end if;
 end $$;
 
 create or replace function public.list_counts(p_city text default null, p_sector text default null)
@@ -293,14 +398,174 @@ begin
   return n;
 end $$;
 
+
+-- ---------- Erişim, ekip ve müşteri fonksiyonları ----------
+create or replace function public.my_access()
+returns table (role text, perms text[], display_name text)
+language sql stable security definer set search_path = public as $$
+  select coalesce(u.role, 'none'), public.role_perms(u.role), u.display_name
+    from (select auth.uid() as id) a left join public.user_roles u on u.user_id = a.id
+   where a.id is not null;
+$$;
+
+create or replace function public.team_list()
+returns table (user_id uuid, email text, display_name text, role text, last_sign_in_at timestamptz, created_at timestamptz)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.has_perm('team') then raise exception 'Bu işlem için yetkiniz yok'; end if;
+  return query
+    select u.id, u.email::text, r.display_name, coalesce(r.role, 'none'), u.last_sign_in_at, u.created_at
+      from auth.users u left join public.user_roles r on r.user_id = u.id
+     order by u.created_at, u.id;
+end $$;
+
+create or replace function public.set_user_role(p_user uuid, p_role text, p_name text default null)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.has_perm('team') then raise exception 'Bu işlem için yetkiniz yok'; end if;
+  if p_role not in ('admin','sales','designer','none') then raise exception 'Geçersiz rol: %', p_role; end if;
+  if not exists (select 1 from auth.users where id = p_user) then raise exception 'Kullanıcı bulunamadı'; end if;
+  if p_role <> 'admin' and exists (select 1 from public.user_roles where user_id = p_user and role = 'admin')
+     and (select count(*) from public.user_roles where role = 'admin') <= 1 then
+    raise exception 'Son yönetici kaldırılamaz veya düşürülemez';
+  end if;
+  if p_role = 'none' then
+    delete from public.user_roles where user_id = p_user;
+  else
+    insert into public.user_roles (user_id, role, display_name) values (p_user, p_role, nullif(btrim(p_name), ''))
+    on conflict (user_id) do update set role = excluded.role,
+      display_name = coalesce(nullif(btrim(p_name), ''), public.user_roles.display_name);
+  end if;
+end $$;
+
+-- Tarama servisi (service_role) bir kullanıcının iznini sorar
+create or replace function public.user_can(p_user uuid, p_perm text)
+returns boolean language sql stable security definer set search_path = public as $$
+  select coalesce(p_perm = any (public.role_perms((select role from public.user_roles where user_id = p_user))), false);
+$$;
+
+create or replace function public.stage_label(s text) returns text language sql immutable as $$
+  select case s
+    when 'sale_done' then 'Satış gerçekleşti' when 'collecting' then 'Bilgi toplanıyor'
+    when 'designing' then 'Site tasarlanıyor' when 'client_review' then 'Müşteri onayında'
+    when 'live' then 'Yayında' when 'paused' then 'Beklemede' when 'cancelled' then 'İptal' else s end
+$$;
+
+create or replace view public.v_customers with (security_invoker = true) as
+select c.*, n.body as last_note, n.created_at as last_note_at
+  from public.customers c
+  left join lateral (select body, created_at from public.customer_notes
+                      where customer_id = c.id and kind in ('note','stage')
+                      order by created_at desc limit 1) n on true;
+
+create or replace function public.create_customer(p_name text, p_phone text default null, p_city text default null,
+    p_sector text default null, p_amount numeric default null, p_note text default null)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare cid uuid;
+begin
+  if not public.has_perm('customers_write') then raise exception 'Bu işlem için yetkiniz yok'; end if;
+  if length(btrim(coalesce(p_name, ''))) < 2 or length(p_name) > 120 then raise exception 'Müşteri adı 2-120 karakter olmalı'; end if;
+  insert into public.customers (name, phone, city, sector, amount)
+  values (btrim(p_name), nullif(btrim(p_phone), ''), nullif(btrim(p_city), ''), nullif(btrim(p_sector), ''), p_amount)
+  returning id into cid;
+  insert into public.customer_notes (customer_id, user_id, kind, body)
+  values (cid, auth.uid(), 'created', coalesce(nullif(btrim(p_note), ''), 'Müşteri elle eklendi'));
+  return cid;
+end $$;
+
+create or replace function public.update_customer(p_id uuid, p_patch jsonb)
+returns void language plpgsql security definer set search_path = public as $$
+declare k text; labels text[] := '{}';
+begin
+  if not public.has_perm('customers_write') then raise exception 'Bu işlem için yetkiniz yok'; end if;
+  if jsonb_typeof(p_patch) <> 'object' then raise exception 'Geçersiz istek'; end if;
+  for k in select jsonb_object_keys(p_patch) loop
+    if k not in ('name','phone','city','sector','amount','domain','next_step','next_step_at') then
+      raise exception 'Güncellenemeyen alan: %', k;
+    end if;
+    labels := labels || case k when 'name' then 'ad' when 'phone' then 'telefon' when 'city' then 'şehir' when 'sector' then 'sektör'
+      when 'amount' then 'tutar' when 'domain' then 'alan adı' when 'next_step' then 'sıradaki adım' else 'adım tarihi' end;
+  end loop;
+  if p_patch ? 'name' and length(btrim(coalesce(p_patch->>'name', ''))) < 2 then raise exception 'Müşteri adı en az 2 karakter olmalı'; end if;
+  perform 1 from public.customers where id = p_id for update;
+  if not found then raise exception 'Müşteri bulunamadı'; end if;
+  update public.customers set
+    name         = case when p_patch ? 'name'         then btrim(p_patch->>'name') else name end,
+    phone        = case when p_patch ? 'phone'        then nullif(btrim(p_patch->>'phone'), '') else phone end,
+    city         = case when p_patch ? 'city'         then nullif(btrim(p_patch->>'city'), '') else city end,
+    sector       = case when p_patch ? 'sector'       then nullif(btrim(p_patch->>'sector'), '') else sector end,
+    amount       = case when p_patch ? 'amount'       then nullif(btrim(p_patch->>'amount'), '')::numeric else amount end,
+    domain       = case when p_patch ? 'domain'       then nullif(btrim(p_patch->>'domain'), '') else domain end,
+    next_step    = case when p_patch ? 'next_step'    then nullif(btrim(p_patch->>'next_step'), '') else next_step end,
+    next_step_at = case when p_patch ? 'next_step_at' then nullif(btrim(p_patch->>'next_step_at'), '')::timestamptz else next_step_at end,
+    updated_at   = now()
+   where id = p_id;
+  if array_length(labels, 1) > 0 then
+    insert into public.customer_notes (customer_id, user_id, kind, body)
+    values (p_id, auth.uid(), 'edit', 'Güncellendi: ' || array_to_string(labels, ', '));
+  end if;
+end $$;
+
+create or replace function public.set_customer_stage(p_id uuid, p_stage text, p_note text default null)
+returns void language plpgsql security definer set search_path = public as $$
+declare old text;
+begin
+  if not public.has_perm('customers_write') then raise exception 'Bu işlem için yetkiniz yok'; end if;
+  if p_stage not in ('sale_done','collecting','designing','client_review','live','paused','cancelled') then
+    raise exception 'Geçersiz aşama: %', p_stage;
+  end if;
+  select stage into old from public.customers where id = p_id for update;
+  if not found then raise exception 'Müşteri bulunamadı'; end if;
+  if old = p_stage then return; end if;
+  update public.customers set stage = p_stage, stage_changed_at = now(), updated_at = now() where id = p_id;
+  insert into public.customer_notes (customer_id, user_id, kind, body)
+  values (p_id, auth.uid(), 'stage', public.stage_label(old) || ' → ' || public.stage_label(p_stage)
+          || coalesce(E'\n' || nullif(btrim(p_note), ''), ''));
+end $$;
+
+create or replace function public.add_customer_note(p_id uuid, p_body text)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.has_perm('customers_write') then raise exception 'Bu işlem için yetkiniz yok'; end if;
+  if length(btrim(coalesce(p_body, ''))) = 0 or length(p_body) > 4000 then raise exception 'Not 1-4000 karakter olmalı'; end if;
+  if not exists (select 1 from public.customers where id = p_id) then raise exception 'Müşteri bulunamadı'; end if;
+  insert into public.customer_notes (customer_id, user_id, kind, body) values (p_id, auth.uid(), 'note', btrim(p_body));
+  update public.customers set updated_at = now() where id = p_id;
+end $$;
+
+-- Müşteri geçmişi: notlar + aşama değişiklikleri, yazan kişinin adıyla (ad yoksa e-posta başı)
+create or replace function public.customer_timeline(p_id uuid)
+returns table (id uuid, kind text, body text, created_at timestamptz, author text)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.has_perm('customers') then raise exception 'Bu işlem için yetkiniz yok'; end if;
+  return query
+    select n.id, n.kind, n.body, n.created_at, coalesce(r.display_name, split_part(u.email::text, '@', 1), 'Ekip')
+      from public.customer_notes n
+      left join public.user_roles r on r.user_id = n.user_id
+      left join auth.users u on u.id = n.user_id
+     where n.customer_id = p_id
+     order by n.created_at desc, n.id
+     limit 300;
+end $$;
+
 -- Fonksiyon yetkileri: anon hiçbirini çağıramaz
 revoke all on function public.next_business(text,text,text,uuid[]), public.release_business(uuid),
   public.move_to_call_list(uuid), public.log_call(uuid,text,text,timestamptz), public.list_counts(text,text),
-  public.filter_options(), public.stats(), public.search_history(text,int), public.ingest_businesses(jsonb)
+  public.filter_options(), public.stats(), public.search_history(text,int), public.ingest_businesses(jsonb),
+  public.my_access(), public.team_list(), public.set_user_role(uuid,text,text),
+  public.create_customer(text,text,text,text,numeric,text), public.update_customer(uuid,jsonb),
+  public.set_customer_stage(uuid,text,text), public.add_customer_note(uuid,text), public.user_can(uuid,text), public.customer_timeline(uuid),
+  public.has_perm(text), public.role_perms(text), public.stage_label(text)
   from public, anon, authenticated;
 grant execute on function public.next_business(text,text,text,uuid[]), public.release_business(uuid),
   public.move_to_call_list(uuid), public.log_call(uuid,text,text,timestamptz), public.list_counts(text,text),
-  public.filter_options(), public.stats(), public.search_history(text,int) to authenticated;
-grant execute on function public.ingest_businesses(jsonb) to service_role;
-revoke all on public.v_queue from anon;
-grant select on public.v_queue to authenticated;
+  public.filter_options(), public.stats(), public.search_history(text,int),
+  public.my_access(), public.team_list(), public.set_user_role(uuid,text,text),
+  public.create_customer(text,text,text,text,numeric,text), public.update_customer(uuid,jsonb),
+  public.set_customer_stage(uuid,text,text), public.add_customer_note(uuid,text), public.stage_label(text), public.customer_timeline(uuid) to authenticated;
+-- Politikalar ve görünümler bu iki fonksiyonu çağırdığı için giriş yapmış kullanıcıda çalışabilmeli
+grant execute on function public.has_perm(text), public.role_perms(text) to authenticated;
+grant execute on function public.ingest_businesses(jsonb), public.user_can(uuid,text) to service_role;
+revoke all on public.v_queue, public.v_customers from anon;
+grant select on public.v_queue, public.v_customers to authenticated;
