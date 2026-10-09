@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex,nofollow,noarchive">
 <meta name="referrer" content="no-referrer">
 <title>Vitrin Arama Listesi</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js" integrity="sha384-BWcjm9OdFth9TbhCxZPdm+gAOUMAzQy9nmTs12ioXdCcbVnJaPMn+fMUoQCLt60R" crossorigin="anonymous"></script>
 <style>
   :root{color-scheme:light;--bg:#fff;--fill:#f5f5f7;--fill-h:#ebebef;--ink:#1d1d1f;--mute:#6e6e73;--line:#d2d2d7;--brand:#0071e3;--brand-h:#0077ed;--ok:#1d8a3e;--warn:#b25e00;--bad:#d70015}
   *{box-sizing:border-box}
@@ -251,7 +251,7 @@ async function loadNext(){
   addTag(tags, `Skor ${pick.lead_score}`);
   const ph=$('bPhone'); ph.textContent = pick.phone_raw; ph.href = 'tel:'+(pick.phone_normalized||'');
   setupWa(pick); $('tplBox').classList.add('hide');
-  const mp=$('bMaps'); mp.href = pick.maps_url || '#'; mp.classList.toggle('hide',!pick.maps_url);
+  const mp=$('bMaps'); const okMaps=/^https:\/\//.test(pick.maps_url||''); mp.href = okMaps ? pick.maps_url : '#'; mp.classList.toggle('hide',!okMaps);
   const h=$('bHistory'); h.textContent='';
   if(pick.attempt_count>0){
     const c = await sb.from('calls').select('called_at,outcome,note').eq('business_id',pick.id).order('called_at',{ascending:false}).limit(3);
@@ -342,6 +342,9 @@ async function loadHistory(){
     r.insertCell().textContent = c.note || '';
   });
 }
+
+// Oturum süresi dolarsa/çıkış yapılırsa giriş ekranına dön
+sb.auth.onAuthStateChange((ev)=>{ if(ev==='SIGNED_OUT') showLogin(); });
 
 init();
 </script>
