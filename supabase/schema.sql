@@ -444,12 +444,7 @@ returns boolean language sql stable security definer set search_path = public as
   select coalesce(p_perm = any (public.role_perms((select role from public.user_roles where user_id = p_user))), false);
 $$;
 
-create or replace function public.stage_label(s text) returns text language sql immutable as $$
-  select case s
-    when 'sale_done' then 'Satış gerçekleşti' when 'collecting' then 'Bilgi toplanıyor'
-    when 'designing' then 'Site tasarlanıyor' when 'client_review' then 'Müşteri onayında'
-    when 'live' then 'Yayında' when 'paused' then 'Beklemede' when 'cancelled' then 'İptal' else s end
-$$;
+create or replace function public.stage_label(s text) returns text language sql immutable as $$ select case s when 'sale_done' then 'Satış gerçekleşti' when 'collecting' then 'Bilgi toplanıyor' when 'designing' then 'Site tasarlanıyor' when 'client_review' then 'Müşteri onayında' when 'live' then 'Yayında' when 'paused' then 'Beklemede' when 'cancelled' then 'İptal' else s end $$;
 
 create or replace view public.v_customers with (security_invoker = true) as
 select c.*, n.body as last_note, n.created_at as last_note_at
