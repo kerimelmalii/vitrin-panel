@@ -16,7 +16,8 @@
   .wrap{max-width:640px;margin:0 auto;padding:28px 20px 60px}
   header{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:22px}
   h1{font-size:32px;line-height:1.1;font-weight:700;letter-spacing:-.022em;margin:0}
-  .stats{display:flex;gap:16px;align-items:center;font-size:14px;color:var(--mute)}
+  .stats{display:flex;gap:6px 16px;align-items:center;flex-wrap:wrap;font-size:14px;color:var(--mute)}
+  .stats>span{white-space:nowrap}
   .stats b{color:var(--ink);font-weight:600}
   .link{background:none;border:0;padding:0;font:inherit;color:var(--brand);cursor:pointer}
   .link:hover{text-decoration:underline}
@@ -45,6 +46,14 @@
   .row2>*{flex:1}
   .muted{color:var(--mute)}
   .skip{display:block;margin:18px auto 0;font-size:14px}
+  .wa{display:flex;gap:8px;align-items:center;margin-top:16px}
+  .wa .btn{flex:1;background:#1faa59;color:#fff;font-weight:600}
+  .wa .btn:hover{background:#198f4a}
+  .wa .btn[disabled]{background:#fff;color:var(--mute);cursor:default}
+  .wa .link{font-size:14px;white-space:nowrap}
+  #tplBox{margin-top:10px}
+  #tplBox textarea{min-height:150px;margin:6px 0 0;font-size:14px}
+  .wahint{font-size:13px;color:var(--mute);margin-top:6px}
   table{width:100%;border-collapse:collapse;font-size:14px}
   td,th{padding:12px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
   th{color:var(--mute);font-weight:500;font-size:13px}
@@ -81,8 +90,9 @@
     <header>
       <h1>Vitrin</h1>
       <div class="stats">
-        <span>Bu hafta <b id="weekCount">0</b> / <span id="weekGoal">100</span></span>
+        <span>Arama <b id="weekCount">0</b>/<span id="weekGoal">100</span></span>
         <span>Kuyruk <b id="queueCount">-</b></span>
+        <span>WhatsApp <b id="waToday">0</b></span>
         <button class="link" id="logout">Çıkış</button>
       </div>
     </header>
@@ -106,15 +116,27 @@
         <div class="meta"><a id="bMaps" target="_blank" rel="noopener">Google Haritalar'da aç</a></div>
         <div id="bHistory" class="meta" style="margin-top:8px"></div>
 
+        <div class="wa">
+          <button class="btn" id="waBtn">WhatsApp'tan yaz</button>
+          <button class="link" id="tplToggle">Mesajı düzenle</button>
+        </div>
+        <div class="wahint" id="waHint"></div>
+        <div id="tplBox" class="hide">
+          <label>Mesaj şablonu ({isim} işletme adıyla değişir; "dur" cümlesini silme)</label>
+          <textarea id="tplText"></textarea>
+          <div class="row2"><button class="btn" id="tplReset">Varsayılana dön</button><button class="btn primary" id="tplSave">Kaydet</button></div>
+        </div>
+
         <textarea id="note" placeholder="Görüşme notu (kiminle konuşuldu, ne dedi, ne zaman tekrar aransın...)"></textarea>
 
         <div class="grid">
+          <button class="btn ok" data-o="wa_sent">WhatsApp gönderdim</button>
           <button class="btn warn" data-o="no_answer">Açmadı / ulaşılamadı</button>
           <button class="btn" data-o="callback">Sonra ara…</button>
           <button class="btn ok" data-o="interested">İlgilendi</button>
           <button class="btn ok" data-o="won">Satış oldu</button>
           <button class="btn bad" data-o="rejected">İlgilenmiyor</button>
-          <button class="btn bad" data-o="do_not_contact">Bir daha aramayın</button>
+          <button class="btn bad" data-o="do_not_contact">Dur dedi / bir daha yazma</button>
           <button class="btn" data-o="wrong_number">Yanlış numara</button>
           <button class="btn" data-o="closed_business">İşletme kapalı</button>
         </div>
@@ -147,10 +169,11 @@ const WEEKLY_GOAL       = 100;
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const $ = id => document.getElementById(id);
-const OUTCOME_TR = {no_answer:'Açmadı', callback:'Sonra aranacak', interested:'İlgilendi', won:'Satış',
-  rejected:'İlgilenmiyor', do_not_contact:'Aramayın', wrong_number:'Yanlış numara', closed_business:'Kapalı'};
+const OUTCOME_TR = {wa_sent:'WhatsApp gönderildi', no_answer:'Açmadı', callback:'Sonra aranacak', interested:'İlgilendi', won:'Satış',
+  rejected:'İlgilenmiyor', do_not_contact:'Dur dedi / aramayın', wrong_number:'Yanlış numara', closed_business:'Kapalı'};
 const WEB_TR = {none:'Web sitesi yok', social_only:'Sadece sosyal medya'};
-let current = null, skipped = new Set(), busy = false;
+let current = null, skipped = new Set(), busy = false, waTodayCount = 0;
+const WA_DAILY_LIMIT = 25;   // önerilen günlük üst sınır (engellemez, uyarır)
 
 function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('on'); setTimeout(()=>t.classList.remove('on'),2200); }
 function fmt(d){ return d ? new Date(d).toLocaleString('tr-TR',{dateStyle:'short',timeStyle:'short'}) : ''; }
@@ -190,11 +213,14 @@ function applyFilters(q){
   if($('sectorFilter').value) q=q.eq('sector',$('sectorFilter').value);
   return q;
 }
-const dueFilter = ()=>`status.eq.new,and(status.eq.no_answer,no_answer_count.lt.3,next_action_at.lte.${new Date().toISOString()})`;
+const dueFilter = ()=>{ const n=new Date().toISOString(); return `status.eq.new,and(status.eq.no_answer,no_answer_count.lt.3,next_action_at.lte.${n}),and(status.eq.wa_sent,next_action_at.lte.${n})`; };
 
 async function refreshCounts(){
-  const wk = await sb.from('calls').select('id',{count:'exact',head:true}).gte('called_at',mondayISO());
+  const wk = await sb.from('calls').select('id',{count:'exact',head:true}).gte('called_at',mondayISO()).neq('outcome','wa_sent');
   $('weekCount').textContent = wk.count ?? 0;
+  const t0 = new Date(); t0.setHours(0,0,0,0);
+  const wa = await sb.from('calls').select('id',{count:'exact',head:true}).gte('called_at',t0.toISOString()).eq('outcome','wa_sent');
+  waTodayCount = wa.count ?? 0; $('waToday').textContent = waTodayCount + ' / ' + WA_DAILY_LIMIT;
   const nowIso = new Date().toISOString();
   let q1 = applyFilters(sb.from('businesses').select('id',{count:'exact',head:true}).eq('status','callback').lte('next_action_at',nowIso));
   let q2 = applyFilters(sb.from('businesses').select('id',{count:'exact',head:true}).or(dueFilter()));
@@ -224,6 +250,7 @@ async function loadNext(){
   addTag(tags, pick.sector); addTag(tags, [pick.city,pick.district].filter(Boolean).join(' / '));
   addTag(tags, `Skor ${pick.lead_score}`);
   const ph=$('bPhone'); ph.textContent = pick.phone_raw; ph.href = 'tel:'+(pick.phone_normalized||'');
+  setupWa(pick); $('tplBox').classList.add('hide');
   const mp=$('bMaps'); mp.href = pick.maps_url || '#'; mp.classList.toggle('hide',!pick.maps_url);
   const h=$('bHistory'); h.textContent='';
   if(pick.attempt_count>0){
@@ -232,10 +259,44 @@ async function loadNext(){
   }
 }
 
+// ---- WhatsApp (yarı elle) ----
+const DEFAULT_TPL = "Merhaba, {isim} için yazıyorum. Vitrin Web olarak küçük işletmelere hızlı ve uygun fiyatlı web sitesi hazırlıyoruz. Google Haritalar'daki yüksek puanınızı bir web sitesiyle güçlendirmek isteriz. İlgilenirseniz kısaca bilgi verebilirim.\n\nBu mesajı istemiyorsanız \"dur\" yazmanız yeterli, bir daha yazmayacağız.\nvitrinweb.com.tr";
+function getTpl(){ try{ return localStorage.getItem('vitrin_wa_tpl') || DEFAULT_TPL; }catch(e){ return DEFAULT_TPL; } }
+function setTpl(v){ try{ v ? localStorage.setItem('vitrin_wa_tpl',v) : localStorage.removeItem('vitrin_wa_tpl'); }catch(e){} }
+function shortName(n){
+  let x = (n||'').split(/\s[\/|]\s|\s-\s|\s\|\s|\/|\|/)[0].trim();     // SEO ekleri at
+  if(x.length>40){ x = x.slice(0,40).replace(/\s+\S*$/,''); }
+  return x || n;
+}
+function isMobile(b){ return /^\+905\d{9}$/.test(b.phone_normalized||''); }
+function waLink(b){
+  const text = getTpl().replace(/\{isim\}/g, shortName(b.name));
+  return 'https://wa.me/' + b.phone_normalized.replace('+','') + '?text=' + encodeURIComponent(text);
+}
+function setupWa(b){
+  const btn=$('waBtn'), hint=$('waHint');
+  if(isMobile(b)){ btn.disabled=false; btn.textContent="WhatsApp'tan yaz";
+    hint.textContent = "WhatsApp mesajı hazır yazılmış açılır. Gözden geçir, kendin gönder, sonra \"WhatsApp gönderdim\" de."; }
+  else { btn.disabled=true; btn.textContent='Sabit hat, WhatsApp yok';
+    hint.textContent = 'Bu numara sabit hat, arayarak ulaşabilirsin.'; }
+}
+$('waBtn').onclick = ()=>{
+  if(!current || !isMobile(current)) return;
+  if(waTodayCount >= WA_DAILY_LIMIT) toast('Bugünkü önerilen WhatsApp sınırına ulaştın (' + WA_DAILY_LIMIT + '). Yarın devam etmek numaranı korur.');
+  window.open(waLink(current), '_blank', 'noopener');
+};
+$('tplToggle').onclick = ()=>{ $('tplText').value = getTpl(); $('tplBox').classList.toggle('hide'); };
+$('tplReset').onclick  = ()=>{ setTpl(null); $('tplText').value = DEFAULT_TPL; toast('Varsayılan mesaj yüklendi'); };
+$('tplSave').onclick   = ()=>{
+  const v=$('tplText').value.trim();
+  if(!/dur/i.test(v)){ toast('Mesajda "dur" yazarak vazgeçme cümlesi kalmalı'); return; }
+  setTpl(v===DEFAULT_TPL?null:v); $('tplBox').classList.add('hide'); toast('Mesaj şablonu kaydedildi');
+};
+
 // ---- Sonuç kaydetme ----
 async function save(outcome, callbackAt){
   if(!current || busy) return;
-  if(['rejected','do_not_contact'].includes(outcome) && !confirm(`"${current.name}" bir daha listeye girmeyecek. Onaylıyor musun?`)) return;
+  if(['rejected','do_not_contact'].includes(outcome) && !confirm(`"${current.name}" bir daha listeye girmeyecek (arama ve WhatsApp). Onaylıyor musun?`)) return;
   busy = true;
   const { error } = await sb.rpc('log_call',{ p_business_id:current.id, p_outcome:outcome,
       p_note:$('note').value.trim()||null, p_callback_at:callbackAt||null });
