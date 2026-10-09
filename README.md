@@ -6,7 +6,8 @@ sonuçlar kaydedilir, aranan işletme bir daha çıkmaz. Hedef: haftada ~100 tem
 | Parça | Dosya | Nerede çalışır |
 |---|---|---|
 | Veritabanı | `supabase/schema.sql` | Supabase |
-| Tarama | `scan.py` | Sadece sizin Mac'iniz |
+| Tarama (panelden) | `supabase/functions/scan/index.ts` | Supabase Edge Function |
+| Tarama (terminalden, isteğe bağlı) | `scan.py` | Sadece sizin Mac'iniz |
 | Panel | `public/index.html` | Vercel (`panel.vitrinweb.com.tr`) |
 
 ## Kurulum (bir kez, bu sırayla)
@@ -17,10 +18,25 @@ sonuçlar kaydedilir, aranan işletme bir daha çıkmaz. Hedef: haftada ~100 tem
 3. **Panel:** `public/index.html` içindeki `SUPABASE_URL` ve `SUPABASE_ANON_KEY` (publishable) değerlerinin **şema çalıştırdığınız projeyle aynı** olduğunu kontrol edin.
    Vercel: Framework Preset = *Other*, Build Command boş. Çıktı klasörü `vercel.json` ile `public/` olarak ayarlı.
    Domain: Vercel > Settings > Domains'e `panel.vitrinweb.com.tr`, DNS'te CNAME.
-4. **Tarama anahtarları:** `.env.example` dosyasını `.env` olarak kopyalayıp doldurun (yalnızca kendi Mac'inizde).
+4. **Panelden tarama (önerilen, bir kez kurulur):** aşağıdaki "Panelden tarama" bölümünü yapın.
    Google anahtarını Places API ile kısıtlayın ve Google Cloud > Faturalama > **Bütçeler ve uyarılar** bölümünden bütçe uyarısı kurun.
+5. *(İsteğe bağlı)* Terminalden taramak için `.env.example` dosyasını `.env` olarak kopyalayıp doldurun (yalnızca kendi Mac'inizde).
 
-## Tarama
+## Panelden tarama (Tara sekmesi)
+
+Terminal gerekmez. Panelde **Tara** sekmesinde şehir, ilçe ve sektör yazılır; **Planı göster** hangi bölgelerin taranacağını (taranmış/kapalı olanlar atlanır) ve en çok kaç Google çağrısı yapılacağını gösterir; **Taramayı başlat** bölgeleri sırayla tarar, **Durdur** ile yarıda kesilebilir. Sonuçlar anında WhatsApp / Arama listelerine düşer.
+
+Google anahtarı panelde değil, Supabase'de gizli kalır. Kurulum (bir kez):
+1. Supabase > **Edge Functions** > **Deploy a new function** > **Via Editor**. Ad: `scan`. Editördeki her şeyi silip `supabase/functions/scan/index.ts` dosyasının tamamını yapıştırın, **Deploy**.
+2. Fonksiyonun **Settings** bölümünde **Verify JWT** (legacy secret) seçeneğini **kapatın**. Giriş kontrolünü fonksiyonun kendisi yapar ve kayıtlı kullanıcı dışındakini reddeder.
+3. Supabase > Edge Functions > **Secrets** > **Add new secret**: Ad `GOOGLE_API_KEY`, değer Google'daki Places anahtarınız.
+4. Panelde **Tara** sekmesini deneyin. "Tarama servisi kurulu değil" yazarsa 1. adım eksiktir.
+
+* **Günlük sınır:** Bir günde (Türkiye saatiyle) en çok **60** Google çağrısı yapılır (≈20 bölge). Değiştirmek için `MAX_CALLS_PER_DAY` adlı secret ekleyin. Sınır aşılırsa panel yarın devam etmenizi söyler.
+* **Başka alan adı:** Paneli `panel.vitrinweb.com.tr` dışında bir adresten açacaksanız `ALLOWED_ORIGINS` secret'ına o adresi (virgülle) ekleyin.
+* **Fonksiyonu güncellemek:** Dosya değişince aynı editörde yeni içeriği yapıştırıp yeniden Deploy edin.
+
+## Tarama (terminalden, isteğe bağlı)
 
 ```bash
 # önce deneme: Google'a sorar ama hiçbir şey yazmaz
@@ -52,11 +68,13 @@ python3 scan.py --city Ankara --districts "Çankaya" --sectors "kuaför"
 * Tarayıcı veritabanını yalnızca okuyabilir; her yazma `log_call` vb. fonksiyonlarla olur. Kayıt kapalı, giriş yalnızca eklediğiniz kullanıcılarla.
 * Site `noindex`, çerçevelenemez, sıkı CSP ile yayınlanır; `supabase-js` sürümü sabit ve bütünlük (SRI) denetimli.
 * `scan.py`, SQL ve testler `public/` dışında olduğundan internetten indirilemez.
+* Tarama servisi yalnızca giriş yapmış kullanıcıyı kabul eder, girdileri doğrular ve günlük Google çağrı sınırı koyar. Google anahtarı hiçbir yanıtta görünmez.
 
 ## Testler
 
 ```bash
-python3 -m unittest tests.test_scan                  # tarama mantığı
+python3 -m unittest tests.test_scan                  # tarama mantığı (Python)
+node --test tests/scan_edge.test.mjs                 # panelden tarama servisi (Node 22+)
 node tests/panel.e2e.mjs                             # panel, gerçek tarayıcıda (playwright gerekir)
 PGHOST=... PGUSER=postgres tests/run_sql_tests.sh    # şema + iş kuralları, boş bir Postgres'e karşı
 ```

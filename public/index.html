@@ -63,6 +63,15 @@
   nav button.on .n{color:var(--brand)}
   .btn[disabled]{opacity:.5;cursor:default}
   .wa-extra{display:flex;gap:14px;align-items:center;margin-top:10px;font-size:14px}
+  .plan{margin:14px 0 0;font-size:14px}
+  .plan .u{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+  .plan .u:last-child{border-bottom:0}
+  .bar{height:6px;border-radius:999px;background:#fff;overflow:hidden;margin:14px 0 6px}
+  .bar>i{display:block;height:100%;width:0;background:var(--brand);transition:width .3s}
+  .log{font-size:14px;margin-top:10px}
+  .log div{padding:6px 0;border-bottom:1px solid var(--line)}
+  .chk{display:flex;gap:8px;align-items:center;font-size:14px;color:var(--mute);margin:12px 0 0}
+  .chk input{width:auto}
   #toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(8px);background:rgba(29,29,31,.92);color:#fff;font-size:15px;padding:11px 20px;border-radius:999px;opacity:0;transition:.25s;pointer-events:none}
   #toast.on{opacity:1;transform:translateX(-50%)}
   .hide{display:none!important}
@@ -106,6 +115,7 @@
       <button data-tab="call">Arama<span class="n" id="n_call"></span></button>
       <button data-tab="followup">Takip<span class="n" id="n_followup"></span></button>
       <button data-tab="hist">Geçmiş</button>
+      <button data-tab="scan">Tara</button>
     </nav>
 
     <!-- Arama sekmesi -->
@@ -163,6 +173,29 @@
     <section id="histView" class="hide">
       <input id="histSearch" placeholder="İşletme adı veya not ara…" style="margin-bottom:10px">
       <div class="card" style="padding:8px 16px"><table id="histTable"></table></div>
+    </section>
+
+    <!-- Tarama sekmesi -->
+    <section id="scanView" class="hide">
+      <div class="card">
+        <label for="scCity">Şehir</label>
+        <input id="scCity" placeholder="Ankara" autocomplete="off">
+        <div style="height:12px"></div>
+        <label for="scDistricts">İlçeler (virgülle ayır; boş bırakırsan tüm şehir)</label>
+        <input id="scDistricts" placeholder="Çankaya, Keçiören" autocomplete="off">
+        <div style="height:12px"></div>
+        <label for="scSectors">Sektörler (virgülle ayır)</label>
+        <input id="scSectors" placeholder="kuaför, diş hekimi" autocomplete="off">
+        <label class="chk"><input type="checkbox" id="scForce"> 90 gün içinde taranmış olsa da yeniden tara</label>
+        <div class="row2"><button class="btn primary" id="scPlan">Planı göster</button></div>
+        <div id="scPlanBox" class="plan hide"></div>
+        <div class="row2 hide" id="scRunRow"><button class="btn primary" id="scRun">Taramayı başlat</button></div>
+        <div id="scProg" class="hide"><div class="bar"><i id="scBar"></i></div><div class="meta" id="scProgTxt"></div>
+          <div class="row2"><button class="btn bad" id="scStop">Durdur</button></div></div>
+        <div class="log" id="scLog" aria-live="polite"></div>
+      </div>
+      <div class="meta" style="margin:16px 4px 6px">Son taramalar</div>
+      <div class="card" style="padding:8px 16px"><table id="scHist"></table></div>
     </section>
   </div>
 </div>
@@ -337,10 +370,11 @@ $('toCallList').onclick = async ()=>{
 // ---- Sekmeler / Geçmiş ----
 async function tab(which){
   document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on', b.dataset.tab===which));
-  const isHist = which==='hist';
-  $('callView').classList.toggle('hide',isHist); $('histView').classList.toggle('hide',!isHist);
+  const view = which==='hist' ? 'hist' : which==='scan' ? 'scan' : 'call';
+  $('callView').classList.toggle('hide',view!=='call'); $('histView').classList.toggle('hide',view!=='hist'); $('scanView').classList.toggle('hide',view!=='scan');
   await release();
-  if(isHist){ loadHistory(); return; }
+  if(view==='hist'){ loadHistory(); return; }
+  if(view==='scan'){ loadScanHistory(); return; }
   list = which; skipped.clear(); $('empty').classList.add('hide'); $('biz').classList.add('hide');
   await refreshCounts(); await loadNext();
 }
@@ -359,6 +393,90 @@ async function loadHistory(){
     r.insertCell().textContent = (OUTCOME_TR[c.outcome]||c.outcome) + (c.callback_at ? ' → '+fmt(c.callback_at) : '');
     r.insertCell().textContent = c.note || '';
   });
+}
+
+// ---- Tarama (Supabase Edge Function: Google anahtarı sunucuda kalır) ----
+const SCAN_URL = SUPABASE_URL + '/functions/v1/scan';
+let scanPlan = null, scanStop = false, scanBusy = false;
+window.addEventListener('beforeunload',e=>{ if(scanBusy){ e.preventDefault(); e.returnValue=''; } });
+async function callScan(body){
+  const { data:{ session } } = await sb.auth.getSession();
+  if(!session) throw new Error('Oturum süresi doldu, yeniden giriş yapın.');
+  let r;
+  try{
+    r = await fetch(SCAN_URL,{ method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+session.access_token, 'apikey':SUPABASE_ANON_KEY }, body:JSON.stringify(body) });
+  }catch(e){ throw new Error('Tarama servisine ulaşılamadı. İnternetinizi ya da servisin kurulu olduğunu kontrol edin (README > Panelden tarama).'); }
+  const j = await r.json().catch(()=>({}));
+  if(r.status===404) throw new Error('Tarama servisi kurulu değil. README > "Panelden tarama" adımını yapın.');
+  if(r.status===401 && !j.error) throw new Error('Servis oturumu kabul etmedi. Supabase > Edge Functions > scan > Settings\'te "Verify JWT" kapalı olmalı (README).');
+  if(!r.ok) throw new Error(j.message || ('Hata '+r.status));
+  return j;
+}
+const UNIT_TR = {scan:'taranacak', recent:'90 gün içinde taranmış (atlanır)', closed:'kapalı bölge (atlanır)'};
+function unitLabel(u){ return (u.district||'Tüm şehir')+' · '+u.sector; }
+function scanForm(){ return { city:$('scCity').value, districts:$('scDistricts').value, sectors:$('scSectors').value }; }
+function resetScanPlan(){ scanPlan=null; $('scPlanBox').classList.add('hide'); $('scRunRow').classList.add('hide'); }
+['scCity','scDistricts','scSectors','scForce'].forEach(id=>$(id).addEventListener('input',()=>{ if(!scanBusy) resetScanPlan(); }));
+
+$('scPlan').onclick = async ()=>{
+  if(scanBusy) return;
+  try{
+    $('scPlan').disabled = true;
+    const p = await callScan({ action:'plan', ...scanForm() });
+    scanPlan = p;
+    const box=$('scPlanBox'); box.replaceChildren(); box.classList.remove('hide');
+    const force=$('scForce').checked;
+    p.units.forEach(u=>{ const d=document.createElement('div'); d.className='u';
+      const a=document.createElement('span'); a.textContent=p.city+' / '+unitLabel(u);
+      const b=document.createElement('span'); b.textContent=UNIT_TR[u.status]; b.className=(u.status==='scan'||(force&&u.status==='recent'))?'ok':'muted'; d.append(a,b); box.appendChild(d); });
+    const todo = p.units.filter(u=>u.status==='scan'||(force&&u.status==='recent')).length;
+    const info=document.createElement('div'); info.className='meta'; info.style.marginTop='10px';
+    info.textContent = todo ? `${todo} bölge taranacak, en çok ${todo*3} Google çağrısı. Bugün ${p.usage.used}/${p.usage.limit} çağrı kullanıldı.` : 'Taranacak bölge yok.';
+    box.appendChild(info);
+    $('scRunRow').classList.toggle('hide', !todo);
+    $('scRun').textContent = `Taramayı başlat (${todo} bölge)`;
+  }catch(e){ resetScanPlan(); toast(e.message); }
+  finally{ $('scPlan').disabled=false; }
+};
+
+$('scRun').onclick = async ()=>{
+  if(scanBusy || !scanPlan) return;
+  const force=$('scForce').checked;
+  const units = scanPlan.units.filter(u=>u.status==='scan'||(force&&u.status==='recent'));
+  if(!units.length) return;
+  scanBusy=true; scanStop=false;
+  ['scCity','scDistricts','scSectors','scForce','scPlan'].forEach(id=>$(id).disabled=true);
+  $('scRunRow').classList.add('hide'); $('scProg').classList.remove('hide'); $('scStop').disabled=false; $('scLog').replaceChildren();
+  let saved=0, found=0, done=0, calls=0, stopReason='';
+  const logLine=(t,cls)=>{ const d=document.createElement('div'); d.textContent=t; if(cls) d.className=cls; $('scLog').appendChild(d); };
+  for(const u of units){
+    if(scanStop){ stopReason='Durduruldu.'; break; }
+    $('scProgTxt').textContent = `${done+1}/${units.length}: ${scanPlan.city} / ${unitLabel(u)} taranıyor…`;
+    try{
+      const r = await callScan({ action:'run', city:scanPlan.city, district:u.district, sector:u.sector, force });
+      if(r.skipped){ logLine(`${unitLabel(u)}: ${r.message}`,'muted'); }
+      else { saved+=r.saved; found+=r.found; calls+=r.calls;
+        logLine(`${unitLabel(u)}: ${r.found} bulundu, ${r.matched} uygun, ${r.saved} yeni kaydedildi`+(r.warning?' (uyarı: '+r.warning+')':''), r.saved?'ok':'muted'); }
+    }catch(e){ logLine(`${unitLabel(u)}: ${e.message}`,'bad'); stopReason='Hata nedeniyle durdu.'; break; }
+    done++; $('scBar').style.width = Math.round(done/units.length*100)+'%';
+  }
+  scanBusy=false; ['scCity','scDistricts','scSectors','scForce','scPlan'].forEach(id=>$(id).disabled=false);
+  $('scProg').classList.add('hide'); $('scBar').style.width='0';
+  logLine(`${stopReason?stopReason+' ':''}Özet: ${found} bulundu, ${saved} yeni kaydedildi, ${calls} Google çağrısı.`, 'ok'); $('scLog').lastChild.style.fontWeight='600';
+  resetScanPlan(); toast(saved?`${saved} yeni işletme eklendi`:'Yeni işletme eklenmedi');
+  await Promise.all([loadScanHistory(), loadFilters(), refreshCounts()]);
+};
+$('scStop').onclick = ()=>{ scanStop=true; $('scStop').disabled=true; $('scProgTxt').textContent='Durduruluyor (bu bölge bitince)…'; };
+
+async function loadScanHistory(){
+  const { data, error } = await sb.from('scan_history').select('city,district,sector,scanned_at,places_found,saved').order('scanned_at',{ascending:false}).limit(10);
+  const tbl=$('scHist'); tbl.replaceChildren();
+  const head=tbl.insertRow(); ['Tarih','Bölge','Bulunan','Yeni'].forEach(x=>{const th=document.createElement('th'); th.textContent=x; head.appendChild(th);});
+  if(error){ fail(error); return; }
+  (data||[]).forEach(h=>{ const r=tbl.insertRow();
+    r.insertCell().textContent=fmt(h.scanned_at);
+    r.insertCell().textContent=[h.city,h.district,h.sector].filter(Boolean).join(' / ');
+    r.insertCell().textContent=h.places_found; r.insertCell().textContent=h.saved; });
 }
 
 // Oturum süresi dolarsa/çıkış yapılırsa giriş ekranına dön
