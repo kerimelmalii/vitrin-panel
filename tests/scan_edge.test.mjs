@@ -91,7 +91,7 @@ test('plan: kapalı, yakın zamanda taranmış ve taranacak birimleri ayırır',
   const w = world({ closed: [{ city: 'Bursa', district: null }, { city: 'Ankara', district: 'Keçiören' }], history: [{ city: 'Ankara', district: 'Çankaya', sector: 'kuaför', scanned_at: recent }], usage: 7 });
   let j = await (await call(w, { action: 'plan', city: 'ankara', districts: 'çankaya,keçiören,yenimahalle', sectors: 'Kuaför' })).json();
   assert.deepEqual(j.units.map((u) => [u.district, u.sector, u.status]), [['Çankaya', 'kuaför', 'recent'], ['Keçiören', 'kuaför', 'closed'], ['Yenimahalle', 'kuaför', 'scan']]);
-  assert.equal(j.city, 'Ankara'); assert.equal(j.est_calls, 3); assert.deepEqual(j.usage, { used: 7, limit: 60 });
+  assert.equal(j.city, 'Ankara'); assert.equal(j.est_calls, 3); assert.deepEqual(j.usage, { used: 7, limit: 60 }); assert.equal(j.fits_today, 17);
   j = await (await call(w, { action: 'plan', city: 'Bursa', districts: 'Nilüfer', sectors: 'kuaför' })).json();
   assert.equal(j.units[0].status, 'closed');
   assert.equal((await call(w, { action: 'plan', city: 'Ankara', sectors: '' })).status, 400);
@@ -137,6 +137,21 @@ test('run: Google reddederse anlaşılır hata, geçmişe yazılmaz, anahtar mas
   const j = await r.json();
   assert.equal(r.status, 502); assert.match(j.message, /Places API/); assert.ok(!j.message.includes('AIzaSy'));
   assert.equal(w.log.history.length, 0);
+});
+
+test('run: Google geçici hata (503) verirse bir kez yeniden dener', async () => {
+  const w = world(); let n = 0; const inner = w.f;
+  const f = async (u, i) => (String(u).includes('places.googleapis') && ++n === 1) ? new Response('busy', { status: 503 }) : inner(u, i);
+  const r = await fn.handle(new Request('https://x/f', { method: 'POST', headers: { authorization: 'Bearer j', origin: 'https://panel.vitrinweb.com.tr' }, body: JSON.stringify({ action: 'run', city: 'Ankara', district: 'Çankaya', sector: 'kuaför' }) }),
+    { ...ENV, SLEEP: async () => {} }, f, Date.parse('2026-10-09T12:00:00Z'));
+  assert.equal(r.status, 200); assert.equal((await r.json()).saved, 1); assert.equal(n, 2);
+});
+
+test('run: Google sürekli 503 verirse anlaşılır hata, geçmişe yazılmaz', async () => {
+  const w = world({ googleStatus: 503 });
+  const r = await fn.handle(new Request('https://x/f', { method: 'POST', headers: { authorization: 'Bearer j' }, body: JSON.stringify({ action: 'run', city: 'Ankara', district: 'Çankaya', sector: 'kuaför' }) }),
+    { ...ENV, SLEEP: async () => {} }, w.f, Date.parse('2026-10-09T12:00:00Z'));
+  assert.equal(r.status, 502); assert.match((await r.json()).message, /geçici hata/); assert.equal(w.log.history.length, 0); assert.equal(w.log.google, 2);
 });
 
 test('run: Google anahtarı tanımsızsa açık hata', async () => {

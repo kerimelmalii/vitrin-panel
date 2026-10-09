@@ -176,6 +176,7 @@ export function cleanList(raw: unknown, max: number, what: string, canon: (s: st
 export interface Env {
   SUPABASE_URL: string; SERVICE_KEY: string; GOOGLE_API_KEY: string;
   MAX_CALLS_PER_DAY: number; ALLOWED_ORIGINS: string[];
+  SLEEP?: (ms: number) => Promise<void>;   // yalnızca testler için
 }
 type Fetch = (input: string, init?: any) => Promise<Response>;
 
@@ -251,13 +252,18 @@ async function usageToday(db: Db, now: number): Promise<number> {
   return rows.reduce((n, r) => n + (Number(r.api_calls) || 0), 0);
 }
 
-async function searchText(env: Env, f: Fetch, query: string, token?: string): Promise<any> {
+async function searchText(env: Env, f: Fetch, query: string, token?: string, sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))): Promise<any> {
   const body: any = { textQuery: query, languageCode: "tr", regionCode: "TR", pageSize: PAGE_SIZE };
   if (token) body.pageToken = token;
-  const r = await f(PLACES_URL, {
+  const init = {
     method: "POST", body: JSON.stringify(body),
     headers: { "Content-Type": "application/json", "X-Goog-Api-Key": env.GOOGLE_API_KEY, "X-Goog-FieldMask": FIELD_MASK },
-  });
+  };
+  let r = await f(PLACES_URL, init);
+  if (r.status === 429 || r.status >= 500) {   // geçici hata: bir kez daha dene
+    await sleep(900);
+    r = await f(PLACES_URL, init);
+  }
   if (!r.ok) {
     const t = (await r.text()).slice(0, 200);
     throw new UserError("google_" + r.status, r.status === 403 || r.status === 400
@@ -289,7 +295,7 @@ async function plan(db: Db, env: Env, body: any, now: number) {
     });
   }
   const todo = units.filter((u) => u.status === "scan").length;
-  return { city, units, usage: { used, limit: env.MAX_CALLS_PER_DAY }, est_calls: todo * MAX_PAGES };
+  return { city, units, usage: { used, limit: env.MAX_CALLS_PER_DAY }, est_calls: todo * MAX_PAGES, fits_today: Math.max(0, Math.floor((env.MAX_CALLS_PER_DAY - used) / MAX_PAGES)) };
 }
 
 async function run(db: Db, env: Env, f: Fetch, body: any, now: number) {
@@ -314,7 +320,7 @@ async function run(db: Db, env: Env, f: Fetch, body: any, now: number) {
   let found = 0, calls = 0, token: string | undefined, warning: string | null = null;
   for (let page = 0; page < Math.min(MAX_PAGES, left); page++) {
     let resp: any;
-    try { resp = await searchText(env, f, query, token); }
+    try { resp = await searchText(env, f, query, token, env.SLEEP); }
     catch (e) { if (calls === 0) throw e; warning = (e as Error).message; break; }
     calls++;
     const places: any[] = resp.places ?? [];

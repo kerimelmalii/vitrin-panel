@@ -53,10 +53,16 @@ python3 scan.py --city Ankara --districts "Çankaya" --sectors "kuaför"
 
 ## Panel
 
+Açık/koyu temaya kendiliğinden uyar; telefonda alt gezinme çubuğu, bilgisayarda üst menü kullanır. Üstteki halka haftalık hedefe (100) ilerlemeyi gösterir.
+
+**Masaüstü kısayolları:** `W` WhatsApp'tan yaz, `S` şimdilik atla, `N` nota geç. (Sonuç düğmeleri yanlışlıkla basılmasın diye kısayolsuzdur.)
+
+
 * **WhatsApp:** yeni + cep numarası. "WhatsApp'tan yaz" hazır mesajla açar, ekip gözden geçirip kendi gönderir, sonra "WhatsApp gönderdim". 3 gün sonra **Takip**'e düşer.
   WhatsApp'ı olmayan ya da yazmak istemediğiniz kayıt için **"Arama listesine al"**.
 * **Arama:** sabit hatlar + arama listesine alınanlar + açmayanlar (günde bir tekrar, en fazla 3 deneme; sonra "ulaşılamaz").
 * **Takip:** zamanı gelen "sonra ara", WhatsApp'ı 3 gün önce gidenler, ilgilenenler.
+* **Tara:** şehir/ilçe/sektör girip yeni işletme bulur (aşağıda "Panelden tarama").
 * **Geçmiş:** tüm kayıtlar, ad/not/telefonla arama.
 * İki kişi aynı anda çalışabilir: sunucu bir kartı açana 15 dk "kilitler", diğeri başka kart görür.
 * Sayaçlar (hafta/bugün) Türkiye saatiyle ve ekip toplamıdır. Günlük 25 WhatsApp aşılırsa uyarır (engellemez).
@@ -76,6 +82,8 @@ python3 scan.py --city Ankara --districts "Çankaya" --sectors "kuaför"
 python3 -m unittest tests.test_scan                  # tarama mantığı (Python)
 node --test tests/scan_edge.test.mjs                 # panelden tarama servisi (Node 22+)
 node tests/panel.e2e.mjs                             # panel, gerçek tarayıcıda (playwright gerekir)
+#   ekran görüntüsü: SHOTS=klasör  ·  koyu tema: SCHEME=dark  ·  masaüstü: VIEW=1280x860
+#   erişilebilirlik taraması: AXE=node_modules/axe-core/axe.min.js (npm i axe-core)
 PGHOST=... PGUSER=postgres tests/run_sql_tests.sh    # şema + iş kuralları, boş bir Postgres'e karşı
 ```
 

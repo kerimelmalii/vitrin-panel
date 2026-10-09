@@ -2,228 +2,412 @@
 <html lang="tr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#ffffff">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f5f6fb" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0c0c12" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
 <meta name="robots" content="noindex,nofollow,noarchive">
 <meta name="referrer" content="no-referrer">
-<title>Vitrin Arama Listesi</title>
+<title>Vitrin</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js" integrity="sha384-BWcjm9OdFth9TbhCxZPdm+gAOUMAzQy9nmTs12ioXdCcbVnJaPMn+fMUoQCLt60R" crossorigin="anonymous"></script>
 <style>
-  :root{color-scheme:light;--bg:#fff;--fill:#f5f5f7;--fill-h:#ebebef;--ink:#1d1d1f;--mute:#6e6e73;--line:#d2d2d7;--brand:#0071e3;--brand-h:#0077ed;--ok:#1d8a3e;--warn:#b25e00;--bad:#d70015}
+  :root{
+    color-scheme:light dark;
+    --bg:#f5f6fb; --card:#fff; --card2:#f3f4fa; --ink:#12121c; --mute:#5f6275; --line:#e4e6f0;
+    --brand:#4f46e5; --brand2:#7c3aed; --brand-text:#4338ca; --on-brand:#fff;
+    --wa:#15803d; --ok:#166534; --warn:#92400e; --bad:#991b1b;
+    --ok-bg:rgba(21,128,61,.12); --warn-bg:rgba(180,83,9,.12); --bad-bg:rgba(185,28,28,.10); --info-bg:rgba(79,70,229,.10); --neutral-bg:rgba(95,98,117,.12);
+    --shadow:0 1px 2px rgba(18,18,28,.04),0 8px 28px rgba(18,18,28,.07);
+    --nav-bg:rgba(255,255,255,.82); --ring:rgba(79,70,229,.35);
+    --glow1:rgba(124,58,237,.10); --glow2:rgba(79,70,229,.10);
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --bg:#0c0c12; --card:#16161f; --card2:#1e1e2a; --ink:#f2f2f8; --mute:#a3a6b8; --line:#2a2a38;
+    --brand-text:#a9a4ff; --wa:#15803d; --ok:#4ade80; --warn:#fbbf24; --bad:#f87171;
+    --ok-bg:rgba(74,222,128,.14); --warn-bg:rgba(251,191,36,.14); --bad-bg:rgba(248,113,113,.14); --info-bg:rgba(169,164,255,.16); --neutral-bg:rgba(163,166,184,.16);
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);
+    --nav-bg:rgba(22,22,31,.82); --ring:rgba(169,164,255,.45);
+    --glow1:rgba(124,58,237,.18); --glow2:rgba(79,70,229,.16);
+  }}
   *{box-sizing:border-box}
   html{-webkit-text-size-adjust:100%}
-  body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.47 -apple-system,BlinkMacSystemFont,"SF Pro Text","Inter","Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:640px;margin:0 auto;padding:28px 20px 60px}
-  header{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:22px}
-  h1{font-size:32px;line-height:1.1;font-weight:700;letter-spacing:-.022em;margin:0}
-  .stats{display:flex;gap:6px 16px;align-items:center;flex-wrap:wrap;font-size:14px;color:var(--mute)}
-  .stats>span{white-space:nowrap}
-  .stats b{color:var(--ink);font-weight:600}
-  .link{background:none;border:0;padding:0;font:inherit;color:var(--brand);cursor:pointer}
-  .link:hover{text-decoration:underline}
-  nav{display:inline-flex;background:var(--fill);padding:3px;border-radius:10px;margin-bottom:20px}
-  nav button{font:inherit;font-size:14px;font-weight:500;border:0;background:transparent;color:var(--ink);padding:6px 20px;border-radius:8px;cursor:pointer}
-  nav button.on{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.14)}
-  .card{background:var(--fill);border-radius:22px;padding:28px}
-  .name{font-size:28px;line-height:1.15;font-weight:700;letter-spacing:-.02em;margin:0 0 6px}
-  .meta{color:var(--mute);font-size:15px}
-  a{color:var(--brand);text-decoration:none} a:hover{text-decoration:underline}
-  .phone{display:block;margin:18px 0 6px;font-size:34px;font-weight:600;letter-spacing:-.01em;color:var(--brand)}
-  .phone:hover{text-decoration:none;color:var(--brand-h)}
-  .tags{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0 0}
-  .tag{font-size:13px;padding:3px 11px;border-radius:999px;background:#fff;color:var(--mute)}
-  textarea,input,select{width:100%;font:inherit;font-size:16px;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:#fff;color:var(--ink);outline:none;transition:border-color .15s,box-shadow .15s}
-  textarea:focus,input:focus,select:focus{border-color:var(--brand);box-shadow:0 0 0 4px rgba(0,113,227,.15)}
-  textarea{min-height:96px;margin:20px 0 4px;resize:vertical}
-  .btn{font:inherit;font-size:15px;font-weight:500;border:0;background:#fff;color:var(--ink);padding:13px 14px;border-radius:12px;cursor:pointer;transition:background .15s}
-  .btn:hover{background:var(--fill-h)}
-  .btn:active{transform:scale(.99)}
-  .btn.primary{background:var(--brand);color:#fff}
-  .btn.primary:hover{background:var(--brand-h)}
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
-  .ok{color:var(--ok)} .warn{color:var(--warn)} .bad{color:var(--bad)}
-  .row2{display:flex;gap:8px;margin-top:12px}
-  .row2>*{flex:1}
-  .muted{color:var(--mute)}
-  .skip{display:block;margin:18px auto 0;font-size:14px}
-  .wa{display:flex;gap:8px;align-items:center;margin-top:16px}
-  .wa .btn{flex:1;background:#1faa59;color:#fff;font-weight:600}
-  .wa .btn:hover{background:#198f4a}
-  .wa .btn[disabled]{background:#fff;color:var(--mute);cursor:default}
-  .wa .link{font-size:14px;white-space:nowrap}
-  #tplBox{margin-top:10px}
-  #tplBox textarea{min-height:150px;margin:6px 0 0;font-size:14px}
-  .wahint{font-size:13px;color:var(--mute);margin-top:6px}
-  table{width:100%;border-collapse:collapse;font-size:14px}
-  td,th{padding:12px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
-  th{color:var(--mute);font-weight:500;font-size:13px}
-  tr:last-child td{border-bottom:0}
-  nav{max-width:100%;overflow-x:auto}
-  nav button .n{font-size:12px;color:var(--mute);margin-left:4px}
-  nav button.on .n{color:var(--brand)}
-  .btn[disabled]{opacity:.5;cursor:default}
-  .wa-extra{display:flex;gap:14px;align-items:center;margin-top:10px;font-size:14px}
-  .plan{margin:14px 0 0;font-size:14px}
-  .plan .u{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
-  .plan .u:last-child{border-bottom:0}
-  .bar{height:6px;border-radius:999px;background:#fff;overflow:hidden;margin:14px 0 6px}
-  .bar>i{display:block;height:100%;width:0;background:var(--brand);transition:width .3s}
-  .log{font-size:14px;margin-top:10px}
-  .log div{padding:6px 0;border-bottom:1px solid var(--line)}
-  .chk{display:flex;gap:8px;align-items:center;font-size:14px;color:var(--mute);margin:12px 0 0}
-  .chk input{width:auto}
-  #toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(8px);background:rgba(29,29,31,.92);color:#fff;font-size:15px;padding:11px 20px;border-radius:999px;opacity:0;transition:.25s;pointer-events:none}
-  #toast.on{opacity:1;transform:translateX(-50%)}
+  body{margin:0;min-height:100vh;color:var(--ink);font:16px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro Text","Inter","Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;
+    background:radial-gradient(900px 500px at 8% -10%,var(--glow1),transparent 60%),radial-gradient(800px 480px at 100% 0,var(--glow2),transparent 55%),var(--bg);background-attachment:fixed}
+  h1,h2,h3,p{margin:0}
+  a{color:var(--brand-text);text-decoration:none} a:hover{text-decoration:underline}
+  button,input,select,textarea{font:inherit;color:inherit}
+  button{cursor:pointer}
+  :focus-visible{outline:3px solid var(--ring);outline-offset:2px;border-radius:10px}
   .hide{display:none!important}
-  .center{text-align:center;padding:56px 20px;color:var(--mute)}
-  label{font-size:13px;color:var(--mute);display:block;margin:0 0 6px 2px}
-  #login{max-width:360px;margin:12vh auto 0;background:none;padding:0;text-align:center}
-  #login h1{margin-bottom:6px} #login p.sub{color:var(--mute);margin:0 0 28px}
-  #login form{text-align:left}
-  @media (max-width:480px){h1{font-size:28px}.card{padding:22px;border-radius:20px}.phone{font-size:30px}}
+  .muted{color:var(--mute)} .ok{color:var(--ok)} .warn{color:var(--warn)} .bad{color:var(--bad)}
+  .wrap{max-width:760px;margin:0 auto;padding:calc(18px + env(safe-area-inset-top)) 16px calc(112px + env(safe-area-inset-bottom))}
+
+  /* ---------- üst bar ---------- */
+  .top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:750;font-size:21px;letter-spacing:-.02em}
+  .logo{width:34px;height:34px;border-radius:11px;background:linear-gradient(135deg,var(--brand),var(--brand2));display:grid;place-items:center;box-shadow:0 6px 16px rgba(79,70,229,.35)}
+  .logo svg{width:18px;height:18px;stroke:#fff;fill:none;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+  .stats{display:flex;align-items:center;gap:10px}
+  .goal{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:6px 14px 6px 8px;box-shadow:var(--shadow)}
+  .ring{width:42px;height:42px;transform:rotate(-90deg);flex:none}
+  .ring circle{fill:none;stroke-width:5;stroke-linecap:round}
+  .ring .bg{stroke:var(--line)} .ring .fg{stroke:url(#grad);transition:stroke-dashoffset .6s cubic-bezier(.2,.8,.2,1)}
+  .goal b{font-size:17px;letter-spacing:-.01em} .goal small{display:block;font-size:11.5px;color:var(--mute);line-height:1.2}
+  .mini{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--mute);line-height:1.2}
+  .mini b{color:var(--ink);font-weight:650}
+  .iconbtn{width:40px;height:40px;border-radius:12px;border:1px solid var(--line);background:var(--card);display:grid;place-items:center;color:var(--mute)}
+  .iconbtn:hover{color:var(--ink)}
+  svg.i{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+  /* ---------- gezinme ---------- */
+  nav{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;background:var(--nav-bg);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
+  nav button{flex:1;min-width:0;background:none;border:0;border-radius:14px;padding:7px 2px 5px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;font-weight:600;color:var(--mute);position:relative}
+  nav button[aria-current=page]{color:var(--brand-text)}
+  nav button[aria-current=page] .ico{background:var(--info-bg)}
+  nav .ico{width:46px;height:28px;border-radius:999px;display:grid;place-items:center;transition:background .2s}
+  nav .n{position:absolute;top:1px;left:calc(50% + 6px);min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;font-size:10.5px;font-weight:700;display:grid;place-items:center}
+  nav .n:empty{display:none}
+  @media (min-width:860px){
+    .wrap{padding-bottom:48px}
+    nav{position:sticky;top:12px;bottom:auto;left:auto;right:auto;display:inline-flex;gap:2px;border:1px solid var(--line);border-radius:18px;padding:5px;margin:0 auto 18px;box-shadow:var(--shadow);width:auto}
+    #app{display:flex;flex-direction:column;align-items:stretch}
+    nav button{flex-direction:row;gap:8px;padding:8px 16px;font-size:14px;border-radius:13px;flex:none}
+    nav .ico{width:auto;height:auto;background:none!important}
+    nav button[aria-current=page]{background:var(--info-bg)}
+    nav .n{position:static;margin-left:2px}
+    nav{align-self:center}
+  }
+
+  /* ---------- kartlar & form ---------- */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:26px;padding:26px;box-shadow:var(--shadow);animation:rise .28s ease both}
+  @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  label,.lbl{font-size:12.5px;font-weight:600;color:var(--mute);display:block;margin:0 0 6px 2px;letter-spacing:.01em}
+  input,select,textarea{width:100%;background:var(--card2);border:1px solid transparent;border-radius:14px;padding:12px 14px;outline:none;transition:border-color .15s,box-shadow .15s,background .15s}
+  input::placeholder,textarea::placeholder{color:var(--mute);opacity:.75}
+  input:focus,select:focus,textarea:focus{background:var(--card);border-color:var(--brand);box-shadow:0 0 0 4px var(--ring)}
+  textarea{min-height:84px;resize:vertical}
+  select{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M1 1.5l5 5 5-5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:34px}
+  .btn{border:0;border-radius:14px;padding:13px 16px;font-weight:620;font-size:15px;background:var(--card2);color:var(--ink);display:inline-flex;align-items:center;justify-content:center;gap:8px;text-align:center;transition:transform .08s,filter .15s,background .15s;min-height:46px}
+  .btn:hover{filter:brightness(.97)} .btn:active{transform:scale(.985)}
+  .btn[disabled]{opacity:.5;cursor:default}
+  .btn.primary{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;box-shadow:0 8px 20px rgba(79,70,229,.28)}
+  .btn.wa{background:var(--wa);color:#fff}
+  .btn.dark{background:var(--ink);color:var(--bg)}
+  .btn.block{width:100%}
+  .btn.pos{background:var(--ok-bg);color:var(--ok)} .btn.neg{background:var(--bad-bg);color:var(--bad)} .btn.amber{background:var(--warn-bg);color:var(--warn)}
+  .link{background:none;border:0;padding:0;color:var(--brand-text);font-size:14px;font-weight:550}
+  .link:hover{text-decoration:underline}
+  kbd{font:600 10.5px ui-monospace,SFMono-Regular,Menlo,monospace;padding:1px 6px;border-radius:6px;background:rgba(127,127,140,.22);color:inherit;opacity:.85}
+  @media (hover:none){kbd{display:none}}
+  .row2{display:flex;gap:8px} .row2>*{flex:1}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .space{height:14px}
+
+  /* ---------- işletme kartı ---------- */
+  .filters{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 14px}
+  .filters select{background-color:var(--card);border-color:var(--line);font-size:14px;padding:10px 34px 10px 14px}
+  .biz-top{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}
+  .name{font-size:27px;line-height:1.15;font-weight:760;letter-spacing:-.025em;overflow-wrap:anywhere}
+  .addr{color:var(--mute);font-size:14.5px;margin-top:6px}
+  .score{flex:none;text-align:center;border-radius:16px;padding:8px 12px;min-width:68px}
+  .score b{display:block;font-size:24px;line-height:1;letter-spacing:-.02em} .score small{font-size:11px;font-weight:650;text-transform:uppercase;letter-spacing:.05em}
+  .score.hot{background:var(--ok-bg);color:var(--ok)} .score.good{background:var(--info-bg);color:var(--brand-text)} .score.mid{background:var(--neutral-bg);color:var(--mute)}
+  .tags{display:flex;gap:6px;flex-wrap:wrap;margin:16px 0 0}
+  .tag{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:550;padding:4px 11px;border-radius:999px;background:var(--card2);color:var(--mute)}
+  .tag.star{background:var(--warn-bg);color:var(--warn)} .tag.web{background:var(--info-bg);color:var(--brand-text)}
+  .tag svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2.2}
+  .contact{margin-top:20px;padding:18px;border-radius:20px;background:var(--card2)}
+  .phone{display:block;font-size:32px;font-weight:700;letter-spacing:-.02em;color:var(--ink);font-variant-numeric:tabular-nums}
+  .phone:hover{text-decoration:none;color:var(--brand-text)}
+  .cta{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:14px} .cta .btn{white-space:nowrap}
+  .cta .btn.dark{padding-left:26px;padding-right:26px}
+  .hint{font-size:12.5px;color:var(--mute);margin-top:10px}
+  .linkrow{display:flex;gap:6px 16px;flex-wrap:wrap;margin-top:12px;font-size:14px;align-items:center}
+  #tplBox{margin-top:12px} #tplBox textarea{min-height:150px;font-size:14px;background:var(--card)}
+  .history{margin-top:16px;display:flex;flex-direction:column;gap:6px}
+  .history .h{font-size:13px;color:var(--mute);background:var(--card2);border-radius:12px;padding:7px 12px}
+  .notebox{margin-top:18px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .chip{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:5px 12px;font-size:13px;font-weight:550;color:var(--mute);transition:all .15s}
+  .chip:hover{color:var(--ink);border-color:var(--mute)}
+  .chip.on{background:var(--info-bg);border-color:transparent;color:var(--brand-text)}
+  .outcomes{margin-top:18px;display:flex;flex-direction:column;gap:8px}
+  details.close{margin-top:2px} details.close summary{list-style:none;cursor:pointer;font-size:13.5px;color:var(--mute);padding:8px 2px;font-weight:550}
+  details.close summary::-webkit-details-marker{display:none}
+  details.close summary::after{content:" ▾"} details.close[open] summary::after{content:" ▴"}
+  details.close .grid2{margin-top:2px}
+  #cbBox{margin-top:12px;padding:14px;border-radius:18px;background:var(--card2)}
+  .skip{display:block;margin:16px auto 0;color:var(--mute)}
+
+  .empty,.errbox{text-align:center;padding:46px 22px}
+  .empty svg{width:76px;height:76px;margin:0 auto 14px;display:block}
+  .empty h3,.errbox h3{font-size:19px;letter-spacing:-.01em;margin-bottom:6px}
+  .empty p,.errbox p{color:var(--mute);font-size:14.5px;max-width:34ch;margin:0 auto}
+  .empty .row2,.errbox .row2{max-width:340px;margin:20px auto 0}
+  .skel .l{height:16px;border-radius:8px;background:linear-gradient(90deg,var(--card2),var(--line),var(--card2));background-size:200% 100%;animation:sh 1.2s linear infinite;margin-bottom:12px}
+  @keyframes sh{to{background-position:-200% 0}}
+
+  /* ---------- geçmiş ---------- */
+  .list{list-style:none;margin:0;padding:0}
+  .list li{padding:14px 4px;border-bottom:1px solid var(--line);display:grid;grid-template-columns:1fr auto;gap:2px 12px}
+  .list li:last-child{border-bottom:0}
+  .list .t{font-weight:620;overflow-wrap:anywhere} .list .s{font-size:13px;color:var(--mute)}
+  .list .note{grid-column:1/-1;font-size:13.5px;color:var(--mute);margin-top:4px}
+  .pill{font-size:12px;font-weight:650;padding:3px 10px;border-radius:999px;white-space:nowrap;align-self:start}
+  .pill.ok{background:var(--ok-bg);color:var(--ok)} .pill.warn{background:var(--warn-bg);color:var(--warn)} .pill.bad{background:var(--bad-bg);color:var(--bad)} .pill.info{background:var(--info-bg);color:var(--brand-text)} .pill.neutral{background:var(--neutral-bg);color:var(--mute)}
+  .section-t{font-size:13px;font-weight:650;color:var(--mute);margin:20px 4px 8px;text-transform:uppercase;letter-spacing:.06em}
+  .list.compact li{padding:11px 4px}
+
+  /* ---------- tarama ---------- */
+  .scan-h{display:flex;gap:14px;align-items:center;margin-bottom:18px}
+  .scan-h .logo{width:44px;height:44px;border-radius:14px} .scan-h h2{font-size:20px;letter-spacing:-.02em} .scan-h p{font-size:13.5px;color:var(--mute)}
+  .chk{display:flex;gap:10px;align-items:center;font-size:14px;color:var(--mute);margin:16px 0 0;font-weight:500;cursor:pointer}
+  .chk input{width:18px;height:18px;padding:0;accent-color:var(--brand)}
+  .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:18px}
+  .tile{background:var(--card2);border-radius:16px;padding:12px 14px} .tile b{display:block;font-size:22px;letter-spacing:-.02em} .tile small{font-size:12px;color:var(--mute)}
+  .meter{height:6px;border-radius:99px;background:var(--line);margin-top:8px;overflow:hidden} .meter i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--brand2));border-radius:99px}
+  .plan{margin-top:14px}
+  .plan .u{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 2px;border-bottom:1px solid var(--line);font-size:14.5px}
+  .plan .u:last-child{border-bottom:0}
+  .prog{margin-top:18px;display:flex;flex-direction:column;gap:12px}
+  .prog-head{display:flex;gap:14px;align-items:center}
+  .radar{width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,var(--brand),var(--brand2));position:relative;flex:none}
+  .radar::before,.radar::after{content:"";position:absolute;inset:0;border-radius:50%;border:2px solid var(--brand);animation:ping 1.8s ease-out infinite}
+  .radar::after{animation-delay:.9s}
+  @keyframes ping{from{transform:scale(1);opacity:.7}to{transform:scale(2.1);opacity:0}}
+  .bar{height:8px;border-radius:99px;background:var(--card2);overflow:hidden} .bar>i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--brand),var(--brand2));border-radius:99px;transition:width .35s}
+  .log{margin-top:14px;font-size:14px}
+  .log div{padding:9px 2px;border-bottom:1px solid var(--line)} .log div:last-child{border-bottom:0}
+  .log .sum{font-weight:700;font-size:15px}
+
+  /* ---------- giriş ---------- */
+  #login{max-width:400px;margin:9vh auto 0;text-align:center;padding:34px 28px}
+  #login .logo{width:56px;height:56px;border-radius:18px;margin:0 auto 18px} #login .logo svg{width:28px;height:28px}
+  #login h1{font-size:28px;letter-spacing:-.03em} #login .sub{color:var(--mute);margin:6px 0 26px}
+  #login form{text-align:left} #loginErr{min-height:20px;margin-top:12px;font-size:14px;text-align:center}
+
+  /* ---------- diyalog & bildirim ---------- */
+  dialog{border:0;border-radius:24px;padding:26px;max-width:min(92vw,400px);background:var(--card);color:var(--ink);box-shadow:0 30px 80px rgba(0,0,0,.35)}
+  dialog::backdrop{background:rgba(10,10,20,.55);backdrop-filter:blur(4px)}
+  dialog h3{font-size:19px;letter-spacing:-.01em} dialog p{color:var(--mute);margin:8px 0 22px;font-size:14.5px}
+  #toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom));transform:translate(-50%,10px);max-width:min(92vw,520px);background:var(--ink);color:var(--bg);font-size:14.5px;font-weight:550;padding:12px 20px;border-radius:16px;opacity:0;transition:.25s;pointer-events:none;z-index:50;text-align:center;box-shadow:var(--shadow)}
+  #toast.on{opacity:1;transform:translate(-50%,0)}
+  @media (min-width:860px){#toast{bottom:28px}}
+  @media (max-width:480px){.name{font-size:24px}.phone{font-size:28px}.card{padding:20px;border-radius:24px}.goal .mini{display:none}.tiles{gap:6px}.tile{padding:10px}}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><linearGradient id="grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4f46e5"/><stop offset="1" stop-color="#7c3aed"/></linearGradient></defs></svg>
+<noscript><p style="padding:24px">Bu panel için JavaScript gerekir.</p></noscript>
 <div class="wrap">
 
   <!-- Giriş -->
   <div id="login" class="card hide">
-    <h1>Vitrin</h1><p class="sub">Arama listesine giriş yap</p>
+    <div class="logo"><svg viewBox="0 0 24 24"><path d="M4 5l8 14 8-14"/></svg></div>
+    <h1>Vitrin</h1><p class="sub">Müşteri bulma ve arama paneli</p>
     <form id="loginForm">
-      <label>E-posta</label><input id="email" type="email" autocomplete="username" required>
-      <div style="height:14px"></div>
-      <label>Şifre</label><input id="password" type="password" autocomplete="current-password" required>
-      <div style="height:14px"></div>
-      <button class="btn primary" style="width:100%">Giriş yap</button>
-      <p id="loginErr" class="bad" style="margin:12px 0 0;font-size:14px;text-align:center"></p>
+      <label for="email">E-posta</label><input id="email" type="email" autocomplete="username" required>
+      <div class="space"></div>
+      <label for="password">Şifre</label><input id="password" type="password" autocomplete="current-password" required>
+      <div class="space"></div>
+      <button class="btn primary block">Giriş yap</button>
+      <p id="loginErr" class="bad" role="alert"></p>
     </form>
   </div>
 
   <!-- Uygulama -->
   <div id="app" class="hide">
-    <header>
-      <h1>Vitrin</h1>
+    <header class="top">
+      <div class="brand"><div class="logo"><svg viewBox="0 0 24 24"><path d="M4 5l8 14 8-14"/></svg></div>Vitrin</div>
       <div class="stats">
-        <span>Hafta <b id="weekCount">0</b>/<span id="weekGoal">100</span></span>
-        <span>Bugün <b id="todayCount">0</b></span>
-        <span>WhatsApp <b id="waToday">0</b>/<span id="waLimit">25</span></span>
-        <button class="link" id="logout">Çıkış</button>
+        <div class="goal" title="Bu hafta yapılan temas / hedef">
+          <svg class="ring" viewBox="0 0 48 48" aria-hidden="true"><circle class="bg" cx="24" cy="24" r="20"/><circle class="fg" id="ringFg" cx="24" cy="24" r="20" stroke-dasharray="125.66" stroke-dashoffset="125.66"/></svg>
+          <div><b><span id="weekCount">0</span>/<span id="weekGoal">100</span></b><small>bu hafta</small></div>
+          <div class="mini"><span>Bugün <b id="todayCount">0</b></span><span class="wal">WhatsApp <b id="waToday">0</b>/<span id="waLimit">25</span></span></div>
+        </div>
+        <button class="iconbtn" id="logout" aria-label="Çıkış yap" title="Çıkış yap"><svg class="i" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg></button>
       </div>
     </header>
-    <nav id="tabs">
-      <button data-tab="whatsapp" class="on">WhatsApp<span class="n" id="n_whatsapp"></span></button>
-      <button data-tab="call">Arama<span class="n" id="n_call"></span></button>
-      <button data-tab="followup">Takip<span class="n" id="n_followup"></span></button>
-      <button data-tab="hist">Geçmiş</button>
-      <button data-tab="scan">Tara</button>
+
+    <nav id="tabs" aria-label="Bölümler">
+      <button data-tab="whatsapp" aria-current="page"><span class="ico"><svg class="i" viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5z"/></svg></span>WhatsApp<span class="n" id="n_whatsapp"></span></button>
+      <button data-tab="call"><span class="ico"><svg class="i" viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></svg></span>Arama<span class="n" id="n_call"></span></button>
+      <button data-tab="followup"><span class="ico"><svg class="i" viewBox="0 0 24 24"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></span>Takip<span class="n" id="n_followup"></span></button>
+      <button data-tab="scan"><span class="ico"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/><path d="M11 8v6M8 11h6"/></svg></span>Tara</button>
+      <button data-tab="hist"><span class="ico"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>Geçmiş</button>
     </nav>
 
-    <!-- Arama sekmesi -->
+    <!-- Liste görünümü (WhatsApp / Arama / Takip) -->
     <section id="callView">
-      <div class="row2" style="margin:0 0 16px">
-        <select id="cityFilter"><option value="">Tüm şehirler</option></select>
-        <select id="sectorFilter"><option value="">Tüm sektörler</option></select>
+      <div class="filters">
+        <select id="cityFilter" aria-label="Şehir filtresi"><option value="">Tüm şehirler</option></select>
+        <select id="sectorFilter" aria-label="Sektör filtresi"><option value="">Tüm sektörler</option></select>
       </div>
-      <div id="empty" class="card center hide" aria-live="polite">Bu listede şu an işletme yok.<br>Başka sekmeye bakın, filtreyi değiştirin veya yeni bölge taratın.</div>
-      <div id="biz" class="card hide">
-        <p class="name" id="bName"></p>
-        <div class="meta" id="bAddr"></div>
+
+      <div id="skel" class="card skel hide" aria-hidden="true"><div class="l" style="width:70%;height:26px"></div><div class="l" style="width:45%"></div><div class="l" style="width:90%;height:70px;margin-top:20px"></div><div class="l" style="width:100%;height:46px"></div></div>
+
+      <div id="empty" class="card empty hide" aria-live="polite">
+        <svg viewBox="0 0 80 80" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="muted"><circle cx="40" cy="40" r="28" opacity=".35"/><path d="M28 42l8 8 16-18" stroke="url(#grad)" stroke-width="4"/></svg>
+        <h3>Bu liste temiz</h3>
+        <p>Şu an işlenecek işletme kalmadı. Başka listeye bakabilir ya da yeni bir bölge tarayabilirsin.</p>
+        <div class="row2"><button class="btn" id="emptyOther">Başka liste</button><button class="btn primary" id="emptyScan">Yeni bölge tara</button></div>
+      </div>
+
+      <div id="loadErr" class="card errbox hide" role="alert">
+        <h3>Yüklenemedi</h3><p id="loadErrTxt">Bağlantıyı kontrol edip tekrar dene.</p>
+        <div class="row2"><button class="btn primary" id="retry">Tekrar dene</button></div>
+      </div>
+
+      <article id="biz" class="card hide">
+        <div class="biz-top">
+          <div><h2 class="name" id="bName"></h2><p class="addr" id="bAddr"></p></div>
+          <div class="score" id="bScore"><b></b><small></small></div>
+        </div>
         <div class="tags" id="bTags"></div>
-        <a id="bPhone" class="phone"></a>
-        <div class="meta"><a id="bMaps" target="_blank" rel="noopener">Google Haritalar'da aç</a></div>
-        <div id="bHistory" class="meta" style="margin-top:8px"></div>
 
-        <div class="wa">
-          <button class="btn" id="waBtn">WhatsApp'tan yaz</button>
-          <button class="link" id="tplToggle">Mesajı düzenle</button>
-        </div>
-        <div class="wahint" id="waHint"></div>
-        <div class="wa-extra"><button class="link" id="toCallList">Arama listesine al</button></div>
-        <div id="tplBox" class="hide">
-          <label>Mesaj şablonu ({isim} işletme adıyla değişir; "dur" cümlesini silme)</label>
-          <textarea id="tplText"></textarea>
-          <div class="row2"><button class="btn" id="tplReset">Varsayılana dön</button><button class="btn primary" id="tplSave">Kaydet</button></div>
-        </div>
-
-        <textarea id="note" placeholder="Görüşme notu (kiminle konuşuldu, ne dedi, ne zaman tekrar aransın...)"></textarea>
-
-        <div class="grid">
-          <button class="btn ok" data-o="wa_sent" id="btnWaSent">WhatsApp gönderdim</button>
-          <button class="btn warn" data-o="no_answer">Açmadı / ulaşılamadı</button>
-          <button class="btn" data-o="callback">Sonra ara…</button>
-          <button class="btn ok" data-o="interested">İlgilendi</button>
-          <button class="btn ok" data-o="won">Satış oldu</button>
-          <button class="btn bad" data-o="rejected">İlgilenmiyor</button>
-          <button class="btn bad" data-o="do_not_contact">Dur dedi / bir daha yazma</button>
-          <button class="btn" data-o="wrong_number">Yanlış numara</button>
-          <button class="btn" data-o="closed_business">İşletme kapalı</button>
-        </div>
-        <div id="cbBox" class="hide" style="margin-top:10px">
-          <label>Ne zaman aransın?</label>
-          <div class="row2">
-            <input id="cbAt" type="datetime-local">
-            <button class="btn primary" id="cbSave" style="flex:0 0 auto">Kaydet</button>
+        <div class="contact">
+          <a id="bPhone" class="phone"></a>
+          <div class="cta">
+            <button class="btn wa" id="waBtn">WhatsApp'tan yaz <kbd>W</kbd></button>
+            <a class="btn dark" id="callBtn">Ara</a>
+          </div>
+          <p class="hint" id="waHint"></p>
+          <div class="linkrow">
+            <a id="bMaps" target="_blank" rel="noopener">Haritada aç</a>
+            <button class="link" id="tplToggle">Mesajı düzenle</button>
+            <button class="link" id="toCallList">Arama listesine al</button>
+          </div>
+          <div id="tplBox" class="hide">
+            <label for="tplText">Mesaj şablonu ({isim} işletme adıyla değişir; "dur" cümlesini silme)</label>
+            <textarea id="tplText"></textarea>
+            <div class="row2" style="margin-top:8px"><button class="btn" id="tplReset">Varsayılana dön</button><button class="btn primary" id="tplSave">Kaydet</button></div>
           </div>
         </div>
-        <div><button class="link muted skip" id="skip">Şimdilik atla</button></div>
-      </div>
+
+        <div id="bHistory" class="history"></div>
+
+        <div class="notebox">
+          <label for="note">Görüşme notu</label>
+          <textarea id="note" placeholder="Kiminle konuşuldu, ne dedi, ne zaman tekrar aransın…"></textarea>
+          <div class="chips" id="noteChips">
+            <button type="button" class="chip">Meşguldü</button><button type="button" class="chip">Sahibi yok</button><button type="button" class="chip">Düşünecek</button><button type="button" class="chip">Fiyat sordu</button><button type="button" class="chip">Başka firma ile çalışıyor</button>
+          </div>
+        </div>
+
+        <div class="outcomes">
+          <button class="btn pos block" data-o="wa_sent" id="btnWaSent">WhatsApp gönderdim</button>
+          <div class="grid2">
+            <button class="btn amber" data-o="no_answer">Açmadı / ulaşılamadı</button>
+            <button class="btn" data-o="callback">Sonra ara…</button>
+            <button class="btn pos" data-o="interested">İlgilendi</button>
+            <button class="btn pos" data-o="won">Satış oldu</button>
+          </div>
+          <div id="cbBox" class="hide">
+            <label for="cbAt">Ne zaman aransın?</label>
+            <div class="chips" id="cbChips" style="margin:0 0 10px">
+              <button type="button" class="chip" data-cb="tomorrow">Yarın 10:00</button><button type="button" class="chip" data-cb="2d">2 gün sonra</button><button type="button" class="chip" data-cb="week">Haftaya</button>
+            </div>
+            <div class="row2"><input id="cbAt" type="datetime-local"><button class="btn primary" id="cbSave" style="flex:0 0 auto">Kaydet</button></div>
+          </div>
+          <details class="close" id="closeMenu">
+            <summary>Listeden çıkar</summary>
+            <div class="grid2">
+              <button class="btn neg" data-o="rejected">İlgilenmiyor</button>
+              <button class="btn neg" data-o="do_not_contact">Dur dedi / bir daha yazma</button>
+              <button class="btn" data-o="wrong_number">Yanlış numara</button>
+              <button class="btn" data-o="closed_business">İşletme kapalı</button>
+            </div>
+          </details>
+        </div>
+        <button class="link skip" id="skip">Şimdilik atla <kbd>S</kbd></button>
+      </article>
     </section>
 
-    <!-- Geçmiş sekmesi -->
+    <!-- Geçmiş -->
     <section id="histView" class="hide">
-      <input id="histSearch" placeholder="İşletme adı veya not ara…" style="margin-bottom:10px">
-      <div class="card" style="padding:8px 16px"><table id="histTable"></table></div>
+      <input id="histSearch" type="search" placeholder="İşletme adı, not veya telefon ara…" aria-label="Geçmişte ara" style="margin-bottom:12px;background:var(--card);border-color:var(--line)">
+      <div class="card" style="padding:8px 20px"><ul class="list" id="histList"></ul></div>
     </section>
 
-    <!-- Tarama sekmesi -->
+    <!-- Tarama -->
     <section id="scanView" class="hide">
       <div class="card">
+        <div class="scan-h">
+          <div class="logo"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20.5 20.5l-4.4-4.4"/></svg></div>
+          <div><h2>Yeni müşteri bul</h2><p>Web sitesi olmayan, yüksek puanlı işletmeleri Google Haritalar'dan toplar.</p></div>
+        </div>
         <label for="scCity">Şehir</label>
-        <input id="scCity" placeholder="Ankara" autocomplete="off">
-        <div style="height:12px"></div>
-        <label for="scDistricts">İlçeler (virgülle ayır; boş bırakırsan tüm şehir)</label>
+        <input id="scCity" list="provinces" placeholder="Ankara" autocomplete="off"><datalist id="provinces"></datalist>
+        <div class="space"></div>
+        <label for="scDistricts">İlçeler <span class="muted" style="font-weight:500">(virgülle ayır; boşsa tüm şehir)</span></label>
         <input id="scDistricts" placeholder="Çankaya, Keçiören" autocomplete="off">
-        <div style="height:12px"></div>
-        <label for="scSectors">Sektörler (virgülle ayır)</label>
+        <div class="space"></div>
+        <label for="scSectors">Sektörler <span class="muted" style="font-weight:500">(virgülle ayır)</span></label>
         <input id="scSectors" placeholder="kuaför, diş hekimi" autocomplete="off">
+        <div class="chips" id="sectorChips" aria-label="Sektör önerileri"></div>
         <label class="chk"><input type="checkbox" id="scForce"> 90 gün içinde taranmış olsa da yeniden tara</label>
-        <div class="row2"><button class="btn primary" id="scPlan">Planı göster</button></div>
-        <div id="scPlanBox" class="plan hide"></div>
-        <div class="row2 hide" id="scRunRow"><button class="btn primary" id="scRun">Taramayı başlat</button></div>
-        <div id="scProg" class="hide"><div class="bar"><i id="scBar"></i></div><div class="meta" id="scProgTxt"></div>
-          <div class="row2"><button class="btn bad" id="scStop">Durdur</button></div></div>
+        <div class="space"></div>
+        <button class="btn block" id="scPlan">Planı göster</button>
+
+        <div id="scPlanWrap" class="hide">
+          <div class="tiles" id="scTiles"></div>
+          <div class="plan" id="scPlanBox"></div>
+          <div class="space"></div>
+          <button class="btn primary block hide" id="scRun">Taramayı başlat</button>
+        </div>
+
+        <div id="scProg" class="prog hide">
+          <div class="prog-head"><div class="radar" aria-hidden="true"></div><div><b id="scProgTitle">Taranıyor…</b><div class="muted" id="scProgTxt" style="font-size:13.5px"></div></div></div>
+          <div class="bar"><i id="scBar"></i></div>
+          <button class="btn neg block" id="scStop">Durdur</button>
+        </div>
         <div class="log" id="scLog" aria-live="polite"></div>
       </div>
-      <div class="meta" style="margin:16px 4px 6px">Son taramalar</div>
-      <div class="card" style="padding:8px 16px"><table id="scHist"></table></div>
+      <div class="section-t">Son taramalar</div>
+      <div class="card" style="padding:6px 20px"><ul class="list compact" id="scHist"></ul></div>
     </section>
   </div>
 </div>
-<div id="toast"></div>
+
+<dialog id="dlg" aria-labelledby="dlgTitle">
+  <form method="dialog">
+    <h3 id="dlgTitle"></h3><p id="dlgText"></p>
+    <div class="row2"><button class="btn" value="cancel">Vazgeç</button><button class="btn neg" value="ok" id="dlgOk">Evet</button></div>
+  </form>
+</dialog>
+<div id="toast" role="status" aria-live="polite"></div>
 
 <script>
 // ====== AYAR: Supabase > Project Settings > API ======
 const SUPABASE_URL      = 'https://iskydzodfqyhkfdixnmy.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_VHrB2x1ZRNw8Yisoh2zSwA_M4jgu8Ym';   // publishable key tarayıcıya konabilir; secret key ASLA
 const WEEKLY_GOAL       = 100;
+const WA_DAILY_LIMIT    = 25;   // önerilen günlük üst sınır (engellemez, uyarır)
 // =====================================================
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const $ = id => document.getElementById(id);
 const OUTCOME_TR = {wa_sent:'WhatsApp gönderildi', no_answer:'Açmadı', callback:'Sonra aranacak', interested:'İlgilendi', won:'Satış',
   rejected:'İlgilenmiyor', do_not_contact:'Dur dedi / aramayın', wrong_number:'Yanlış numara', closed_business:'Kapalı'};
+const OUTCOME_CLS = {wa_sent:'ok', no_answer:'warn', callback:'info', interested:'ok', won:'ok', rejected:'bad', do_not_contact:'bad', wrong_number:'neutral', closed_business:'neutral'};
 const WEB_TR = {none:'Web sitesi yok', social_only:'Sadece sosyal medya'};
-let current = null, skipped = new Set(), busy = false, waTodayCount = 0;
-const WA_DAILY_LIMIT = 25;   // önerilen günlük üst sınır (engellemez, uyarır)
-
-function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('on'); setTimeout(()=>t.classList.remove('on'),2200); }
-function fmt(d){ return d ? new Date(d).toLocaleString('tr-TR',{dateStyle:'short',timeStyle:'short'}) : ''; }
-function addTag(parent, text){ const s=document.createElement('span'); s.className='tag'; s.textContent=text; parent.appendChild(s); }
-
-// ---- Yardımcılar ----
 const LISTS = ['whatsapp','call','followup'];
-let list = 'whatsapp', seq = 0;
+const LIST_TR = {whatsapp:'WhatsApp', call:'Arama', followup:'Takip'};
+let current = null, skipped = new Set(), busy = false, waTodayCount = 0, list = 'whatsapp', seq = 0, counts = {};
+
+let toastTimer;
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('on'),2600); }
+function fmt(d){ return d ? new Date(d).toLocaleString('tr-TR',{dateStyle:'short',timeStyle:'short'}) : ''; }
 const fail = (e)=>{ console.error(e); toast('Hata: '+(e && e.message ? e.message : e)); };
+function el(tag, cls, text){ const e=document.createElement(tag); if(cls) e.className=cls; if(text!=null) e.textContent=text; return e; }
+const STAR = '<svg viewBox="0 0 24 24"><path d="M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z" fill="currentColor"/></svg>';
+function confirmDlg(title, text, okLabel){
+  return new Promise(res=>{
+    const d=$('dlg'); $('dlgTitle').textContent=title; $('dlgText').textContent=text; $('dlgOk').textContent=okLabel||'Evet';
+    d.addEventListener('close',()=>res(d.returnValue==='ok'),{once:true}); d.returnValue='cancel'; d.showModal();
+  });
+}
 
 // ---- Oturum ----
 async function init(){
@@ -231,10 +415,10 @@ async function init(){
   const { data:{ session } } = await sb.auth.getSession();
   session ? showApp() : showLogin();
 }
-function showLogin(){ current=null; $('login').classList.remove('hide'); $('app').classList.add('hide'); $('password').value=''; }
+function showLogin(){ current=null; $('login').classList.remove('hide'); $('app').classList.add('hide'); $('password').value=''; document.title='Vitrin'; }
 async function showApp(){
   $('login').classList.add('hide'); $('app').classList.remove('hide');
-  await Promise.all([loadFilters(), refreshCounts()]); await loadNext();
+  await Promise.all([loadFilters(), refreshCounts(), loadNext()]);
 }
 $('loginForm').addEventListener('submit', async e=>{
   e.preventDefault(); $('loginErr').textContent='';
@@ -248,59 +432,75 @@ async function release(){ if(current){ const id=current.id; current=null; await 
 async function loadFilters(){
   const { data, error } = await sb.rpc('filter_options');
   if(error){ fail(error); return; }
-  const cities=[...new Set((data||[]).map(r=>r.city).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'tr'));
-  const sectors=[...new Set((data||[]).map(r=>r.sector).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'tr'));
+  const uniq = k => [...new Set((data||[]).map(r=>r[k]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'tr'));
   const fill=(sel,items,all)=>{ const v=sel.value; sel.replaceChildren(new Option(all,'')); items.forEach(x=>sel.add(new Option(x,x))); sel.value=items.includes(v)?v:''; };
-  fill($('cityFilter'),cities,'Tüm şehirler'); fill($('sectorFilter'),sectors,'Tüm sektörler');
+  fill($('cityFilter'),uniq('city'),'Tüm şehirler'); fill($('sectorFilter'),uniq('sector'),'Tüm sektörler');
 }
-$('cityFilter').onchange = $('sectorFilter').onchange = async ()=>{ await release(); skipped.clear(); await refreshCounts(); await loadNext(); };
+$('cityFilter').onchange = $('sectorFilter').onchange = async ()=>{ await release(); skipped.clear(); await Promise.all([refreshCounts(), loadNext()]); };
 
 // ---- Sayaçlar ----
+const RING_LEN = 2*Math.PI*20;
 async function refreshCounts(){
   const [st, ct] = await Promise.all([
     sb.rpc('stats'),
     sb.rpc('list_counts',{ p_city:$('cityFilter').value||null, p_sector:$('sectorFilter').value||null })
   ]);
   if(st.error) fail(st.error); else {
-    const s=(st.data&&st.data[0])||{};
-    $('weekCount').textContent = s.week_total ?? 0; $('todayCount').textContent = s.today_total ?? 0;
+    const s=(st.data&&st.data[0])||{}, wk=Number(s.week_total ?? 0);
+    $('weekCount').textContent = wk; $('todayCount').textContent = s.today_total ?? 0;
     waTodayCount = Number(s.today_wa ?? 0); $('waToday').textContent = waTodayCount;
-    $('waToday').parentElement.classList.toggle('warn', waTodayCount >= WA_DAILY_LIMIT);
+    $('waToday').closest('.wal').classList.toggle('warn', waTodayCount >= WA_DAILY_LIMIT);
+    $('ringFg').style.strokeDasharray = RING_LEN; $('ringFg').style.strokeDashoffset = RING_LEN*(1-Math.min(wk/WEEKLY_GOAL,1));
   }
   if(ct.error) fail(ct.error); else {
-    const m = Object.fromEntries((ct.data||[]).map(r=>[r.lst, Number(r.n)]));
-    LISTS.forEach(l=>{ $('n_'+l).textContent = m[l] ? ' '+m[l] : ''; });
+    counts = Object.fromEntries((ct.data||[]).map(r=>[r.lst, Number(r.n)]));
+    LISTS.forEach(l=>{ $('n_'+l).textContent = counts[l] || ''; });
+    const total = LISTS.reduce((a,l)=>a+(counts[l]||0),0);
+    document.title = (total ? `(${total}) ` : '') + 'Vitrin';
   }
 }
 
 // ---- Sıradaki işletme (sunucu seçer ve 15 dk kilitler: iki kişi aynı kartı görmez) ----
+function showState(state){   // 'skel' | 'biz' | 'empty' | 'err'
+  $('skel').classList.toggle('hide',state!=='skel'); $('biz').classList.toggle('hide',state!=='biz');
+  $('empty').classList.toggle('hide',state!=='empty'); $('loadErr').classList.toggle('hide',state!=='err');
+}
+function scoreView(n){ return n>=80 ? ['hot','Sıcak'] : n>=60 ? ['good','İyi'] : ['mid','Orta']; }
+function addTag(parent, text, cls, icon){ const s=el('span','tag'+(cls?' '+cls:'')); if(icon) s.innerHTML=icon; s.append(text); parent.appendChild(s); }
+
 async function loadNext(){
   const my = ++seq;
-  current = null; $('cbBox').classList.add('hide'); $('note').value='';
+  current = null; $('cbBox').classList.add('hide'); $('note').value=''; $('closeMenu').open=false;
+  showState('skel');
   const r = await sb.rpc('next_business',{ p_list:list, p_city:$('cityFilter').value||null,
                                            p_sector:$('sectorFilter').value||null, p_skip:[...skipped] });
   if(my !== seq) return;                       // aradan başka bir istek geçtiyse bunu yok say
-  if(r.error){ $('biz').classList.add('hide'); fail(r.error); return; }
+  if(r.error){ showState('err'); $('loadErrTxt').textContent = r.error.message || 'Bağlantıyı kontrol edip tekrar dene.'; console.error(r.error); return; }
   const pick = (r.data||[])[0];
-  if(!pick){ $('biz').classList.add('hide'); $('empty').classList.remove('hide'); return; }
-  current = pick; $('empty').classList.add('hide'); $('biz').classList.remove('hide');
+  if(!pick){ showState('empty'); return; }
+  current = pick; showState('biz');
   $('bName').textContent = pick.name;
   $('bAddr').textContent = pick.address || '';
+  const [sc, sl] = scoreView(pick.lead_score), sbox = $('bScore');
+  sbox.className = 'score '+sc; sbox.firstElementChild.textContent = pick.lead_score; sbox.lastElementChild.textContent = sl;
   const tags=$('bTags'); tags.replaceChildren();
-  addTag(tags, `${pick.rating} ★ (${pick.review_count} yorum)`);
-  addTag(tags, WEB_TR[pick.website_status] || pick.website_status);
+  addTag(tags, `${pick.rating} (${pick.review_count} yorum)`, 'star', STAR);
+  addTag(tags, WEB_TR[pick.website_status] || pick.website_status, 'web');
   addTag(tags, pick.sector); addTag(tags, [pick.city,pick.district].filter(Boolean).join(' / '));
-  addTag(tags, `Skor ${pick.lead_score}`);
-  const ph=$('bPhone'); ph.textContent = pick.phone_raw; ph.href = 'tel:'+(pick.phone_normalized||'');
+  const ph=$('bPhone'); ph.textContent = pick.phone_raw; ph.href = 'tel:'+(pick.phone_normalized||''); $('callBtn').href = ph.href;
   setupWa(pick); $('tplBox').classList.add('hide');
   const okMaps=/^https:\/\//.test(pick.maps_url||''); const mp=$('bMaps'); mp.href = okMaps ? pick.maps_url : '#'; mp.classList.toggle('hide',!okMaps);
-  const h=$('bHistory'); h.textContent='';
+  const h=$('bHistory'); h.replaceChildren();
   if(pick.attempt_count>0){
     const c = await sb.from('calls').select('called_at,outcome,note').eq('business_id',pick.id).order('called_at',{ascending:false}).limit(3);
     if(my !== seq) return;
-    h.textContent = 'Önceki: ' + (c.data||[]).map(x=>`${fmt(x.called_at)} – ${OUTCOME_TR[x.outcome]}${x.note?' ('+x.note+')':''}`).join(' • ');
+    (c.data||[]).forEach(x=>h.appendChild(el('div','h',`${fmt(x.called_at)} · ${OUTCOME_TR[x.outcome]||x.outcome}${x.note?' — '+x.note:''}`)));
+    if(h.firstChild) h.firstChild.textContent = 'Önceki: ' + h.firstChild.textContent;
   }
 }
+$('retry').onclick = loadNext;
+$('emptyScan').onclick = ()=>tab('scan');
+$('emptyOther').onclick = ()=>{ const next = LISTS.find(l=>l!==list && counts[l]) || LISTS[(LISTS.indexOf(list)+1)%3]; tab(next); };
 
 // ---- WhatsApp (yarı elle) ----
 const DEFAULT_TPL = "Merhaba, {isim} için yazıyorum. Vitrin Web olarak küçük işletmelere hızlı ve uygun fiyatlı web sitesi hazırlıyoruz. Google Haritalar'daki yüksek puanınızı bir web sitesiyle güçlendirmek isteriz. İlgilenirseniz kısaca bilgi verebilirim.\n\nBu mesajı istemiyorsanız \"dur\" yazmanız yeterli, bir daha yazmayacağız.\nvitrinweb.com.tr";
@@ -317,13 +517,13 @@ function waLink(b){
   return 'https://wa.me/' + b.phone_normalized.replace('+','') + '?text=' + encodeURIComponent(text);
 }
 function setupWa(b){
-  const btn=$('waBtn'), hint=$('waHint');
-  $('toCallList').classList.toggle('hide', !(isMobile(b) && b.status==='new' && !b.call_list));
-  $('btnWaSent').classList.toggle('hide', !isMobile(b));
-  if(isMobile(b)){ btn.disabled=false; btn.textContent="WhatsApp'tan yaz";
-    hint.textContent = "WhatsApp mesajı hazır yazılmış açılır. Gözden geçir, kendin gönder, sonra \"WhatsApp gönderdim\" de."; }
-  else { btn.disabled=true; btn.textContent='Sabit hat, WhatsApp yok';
-    hint.textContent = 'Bu numara sabit hat, arayarak ulaşabilirsin.'; }
+  const btn=$('waBtn'), hint=$('waHint'), mob=isMobile(b);
+  $('toCallList').classList.toggle('hide', !(mob && b.status==='new' && !b.call_list));
+  $('btnWaSent').classList.toggle('hide', !mob);
+  btn.disabled = !mob; btn.classList.toggle('hide', !mob);
+  $('callBtn').parentElement.style.gridTemplateColumns = mob ? '' : '1fr';
+  hint.textContent = mob ? 'WhatsApp mesajı hazır yazılmış açılır. Gözden geçir, kendin gönder, sonra "WhatsApp gönderdim" de.'
+                         : 'Sabit hat: WhatsApp yok, arayarak ulaşabilirsin.';
 }
 $('waBtn').onclick = ()=>{
   if(!current || !isMobile(current)) return;
@@ -341,62 +541,96 @@ $('tplSave').onclick   = ()=>{
 // ---- Sonuç kaydetme ----
 async function save(outcome, callbackAt){
   if(!current || busy) return;
-  if(['rejected','do_not_contact'].includes(outcome) && !confirm(`"${current.name}" bir daha listeye girmeyecek (arama ve WhatsApp). Onaylıyor musun?`)) return;
+  if(['rejected','do_not_contact'].includes(outcome) &&
+     !await confirmDlg('Listeden kalıcı çıkarılsın mı?', `"${current.name}" bir daha listeye girmeyecek (arama ve WhatsApp). Bu geri alınamaz.`, 'Evet, çıkar')) return;
+  if(!current || busy) return;
   busy = true;
   const { error } = await sb.rpc('log_call',{ p_business_id:current.id, p_outcome:outcome,
       p_note:$('note').value.trim()||null, p_callback_at:callbackAt||null });
   busy = false;
   if(error){ toast('Kaydedilemedi: '+error.message); return; }
   toast('Kaydedildi: '+OUTCOME_TR[outcome]);
-  await refreshCounts(); await loadNext();
+  await Promise.all([refreshCounts(), loadNext()]);
+}
+function cbDate(kind){
+  const d=new Date(); d.setHours(10,0,0,0);
+  if(kind==='tomorrow') d.setDate(d.getDate()+1);
+  else if(kind==='2d') d.setDate(d.getDate()+2);
+  else d.setDate(d.getDate()+((8-d.getDay())%7||7));          // gelecek pazartesi
+  return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);
 }
 document.querySelectorAll('[data-o]').forEach(btn=>btn.addEventListener('click',()=>{
   const o=btn.dataset.o;
-  if(o==='callback'){ const d=new Date(); d.setDate(d.getDate()+1); d.setHours(10,0,0,0);
-    $('cbAt').value = new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);
-    $('cbBox').classList.remove('hide'); return; }
+  if(o==='callback'){ $('cbAt').value = cbDate('tomorrow'); $('cbBox').classList.remove('hide'); $('cbAt').focus(); return; }
   save(o);
 }));
+document.querySelectorAll('[data-cb]').forEach(b=>b.addEventListener('click',()=>{ $('cbAt').value = cbDate(b.dataset.cb); }));
+document.querySelectorAll('#noteChips .chip').forEach(b=>b.addEventListener('click',()=>{
+  const n=$('note'); n.value = n.value.trim() ? n.value.trim().replace(/[.,;]$/,'')+', '+b.textContent.toLowerCase() : b.textContent;
+}));
 $('cbSave').onclick = ()=>{ const v=$('cbAt').value; if(!v){toast('Tarih seçin');return;} save('callback', new Date(v).toISOString()); };
-$('skip').onclick = async ()=>{ if(current){ skipped.add(current.id); await release(); await loadNext(); } };
+$('skip').onclick = skip;
+async function skip(){ if(current){ skipped.add(current.id); await release(); await loadNext(); } }
 $('toCallList').onclick = async ()=>{
   if(!current || busy) return; busy = true;
   const { error } = await sb.rpc('move_to_call_list',{ p_business_id:current.id });
   busy = false;
   if(error){ fail(error); return; }
-  toast('Arama listesine alındı'); await refreshCounts(); await loadNext();
+  toast('Arama listesine alındı'); await Promise.all([refreshCounts(), loadNext()]);
 };
 
-// ---- Sekmeler / Geçmiş ----
+// Klavye kısayolları (masaüstü): W = WhatsApp'tan yaz, S = atla, N = nota git
+document.addEventListener('keydown',e=>{
+  if(e.metaKey||e.ctrlKey||e.altKey||$('dlg').open||$('callView').classList.contains('hide')||$('biz').classList.contains('hide')) return;
+  if(/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) return;
+  const k=e.key.toLowerCase();
+  if(k==='w'){ if(!$('waBtn').disabled) $('waBtn').click(); }
+  else if(k==='s') skip();
+  else if(k==='n'){ e.preventDefault(); $('note').focus(); }
+});
+
+// ---- Sekmeler ----
+const VIEWS = {hist:'histView', scan:'scanView'};
 async function tab(which){
-  document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on', b.dataset.tab===which));
-  const view = which==='hist' ? 'hist' : which==='scan' ? 'scan' : 'call';
-  $('callView').classList.toggle('hide',view!=='call'); $('histView').classList.toggle('hide',view!=='hist'); $('scanView').classList.toggle('hide',view!=='scan');
+  document.querySelectorAll('#tabs button').forEach(b=>b.dataset.tab===which ? b.setAttribute('aria-current','page') : b.removeAttribute('aria-current'));
+  const view = VIEWS[which] || 'callView';
+  ['callView','histView','scanView'].forEach(v=>$(v).classList.toggle('hide', v!==view));
   await release();
-  if(view==='hist'){ loadHistory(); return; }
-  if(view==='scan'){ loadScanHistory(); return; }
-  list = which; skipped.clear(); $('empty').classList.add('hide'); $('biz').classList.add('hide');
-  await refreshCounts(); await loadNext();
+  if(which==='hist'){ loadHistory(); return; }
+  if(which==='scan'){ loadScanHistory(); return; }
+  list = which; skipped.clear(); showState('skel');
+  await Promise.all([refreshCounts(), loadNext()]);
 }
 document.querySelectorAll('#tabs button').forEach(b=>b.addEventListener('click',()=>tab(b.dataset.tab)));
-let hTimer; $('histSearch').oninput=()=>{ clearTimeout(hTimer); hTimer=setTimeout(loadHistory,300); };
 
+// ---- Geçmiş ----
+let hTimer; $('histSearch').oninput=()=>{ clearTimeout(hTimer); hTimer=setTimeout(loadHistory,300); };
+function emptyLi(ul, text){ const li=el('li'); li.style.display='block'; li.appendChild(el('span','s',text)); ul.appendChild(li); }
 async function loadHistory(){
   const { data, error } = await sb.rpc('search_history',{ p_term:$('histSearch').value.trim(), p_limit:150 });
-  const tbl=$('histTable'); tbl.replaceChildren();
-  const head=tbl.insertRow(); ['Tarih','İşletme','Sonuç','Not'].forEach(x=>{const th=document.createElement('th'); th.textContent=x; head.appendChild(th);});
+  const ul=$('histList'); ul.replaceChildren();
   if(error){ fail(error); return; }
-  (data||[]).forEach(c=>{
-    const r=tbl.insertRow();
-    r.insertCell().textContent = fmt(c.called_at);
-    const n=r.insertCell(); n.textContent = c.name; const s=document.createElement('div'); s.className='muted'; s.textContent=c.phone_raw||''; n.appendChild(s);
-    r.insertCell().textContent = (OUTCOME_TR[c.outcome]||c.outcome) + (c.callback_at ? ' → '+fmt(c.callback_at) : '');
-    r.insertCell().textContent = c.note || '';
+  if(!(data||[]).length){ emptyLi(ul, $('histSearch').value.trim() ? 'Sonuç bulunamadı.' : 'Henüz kayıt yok.'); return; }
+  data.forEach(c=>{
+    const li=el('li');
+    const left=el('div'); left.append(el('div','t',c.name), el('div','s',[c.phone_raw, fmt(c.called_at)].filter(Boolean).join(' · ')));
+    li.append(left, el('span','pill '+(OUTCOME_CLS[c.outcome]||'neutral'), (OUTCOME_TR[c.outcome]||c.outcome)+(c.callback_at?' → '+fmt(c.callback_at):'')));
+    if(c.note) li.appendChild(el('div','note',c.note));
+    ul.appendChild(li);
   });
 }
 
 // ---- Tarama (Supabase Edge Function: Google anahtarı sunucuda kalır) ----
 const SCAN_URL = SUPABASE_URL + '/functions/v1/scan';
+const SECTOR_SUGGEST = ['kuaför','berber','güzellik salonu','diş hekimi','veteriner','psikolog','avukat','muhasebeci','emlak ofisi','oto servis','çiçekçi','pastane','spor salonu','fotoğrafçı','temizlik şirketi','nakliyat'];
+const PROVINCES = 'Adana,Adıyaman,Afyonkarahisar,Ağrı,Aksaray,Amasya,Ankara,Antalya,Ardahan,Artvin,Aydın,Balıkesir,Bartın,Batman,Bayburt,Bilecik,Bingöl,Bitlis,Bolu,Burdur,Bursa,Çanakkale,Çankırı,Çorum,Denizli,Diyarbakır,Düzce,Edirne,Elazığ,Erzincan,Erzurum,Eskişehir,Gaziantep,Giresun,Gümüşhane,Hakkari,Hatay,Iğdır,Isparta,İstanbul,İzmir,Kahramanmaraş,Karabük,Karaman,Kars,Kastamonu,Kayseri,Kırıkkale,Kırklareli,Kırşehir,Kilis,Kocaeli,Konya,Kütahya,Malatya,Manisa,Mardin,Mersin,Muğla,Muş,Nevşehir,Niğde,Ordu,Osmaniye,Rize,Sakarya,Samsun,Siirt,Sinop,Sivas,Şanlıurfa,Şırnak,Tekirdağ,Tokat,Trabzon,Tunceli,Uşak,Van,Yalova,Yozgat,Zonguldak'.split(',');
+PROVINCES.forEach(p=>$('provinces').appendChild(new Option(p)));
+const trLower = s => s.replace(/İ/g,'i').replace(/I/g,'ı').toLowerCase();
+const sectorList = () => $('scSectors').value.split(',').map(s=>trLower(s.trim())).filter(Boolean);
+function syncSectorChips(){ const cur=sectorList(); document.querySelectorAll('#sectorChips .chip').forEach(c=>c.classList.toggle('on', cur.includes(c.textContent))); }
+SECTOR_SUGGEST.forEach(s=>{ const b=el('button','chip',s); b.type='button'; b.onclick=()=>{
+  const cur=sectorList(), i=cur.indexOf(s); i>=0 ? cur.splice(i,1) : cur.push(s); $('scSectors').value=cur.join(', '); syncSectorChips(); resetScanPlan(); }; $('sectorChips').appendChild(b); });
+
 let scanPlan = null, scanStop = false, scanBusy = false;
 window.addEventListener('beforeunload',e=>{ if(scanBusy){ e.preventDefault(); e.returnValue=''; } });
 async function callScan(body){
@@ -412,46 +646,52 @@ async function callScan(body){
   if(!r.ok) throw new Error(j.message || ('Hata '+r.status));
   return j;
 }
-const UNIT_TR = {scan:'taranacak', recent:'90 gün içinde taranmış (atlanır)', closed:'kapalı bölge (atlanır)'};
-function unitLabel(u){ return (u.district||'Tüm şehir')+' · '+u.sector; }
-function scanForm(){ return { city:$('scCity').value, districts:$('scDistricts').value, sectors:$('scSectors').value }; }
-function resetScanPlan(){ scanPlan=null; $('scPlanBox').classList.add('hide'); $('scRunRow').classList.add('hide'); }
-['scCity','scDistricts','scSectors','scForce'].forEach(id=>$(id).addEventListener('input',()=>{ if(!scanBusy) resetScanPlan(); }));
+const UNIT_TR = {scan:'taranacak', recent:'90 gün içinde taranmış', closed:'kapalı bölge'};
+const unitLabel = u => (u.district||'Tüm şehir')+' · '+u.sector;
+const scanForm = () => ({ city:$('scCity').value, districts:$('scDistricts').value, sectors:$('scSectors').value });
+const SCAN_INPUTS = ['scCity','scDistricts','scSectors','scForce','scPlan'];
+const setScanLocked = on => SCAN_INPUTS.forEach(id=>$(id).disabled=on);
+function resetScanPlan(){ scanPlan=null; $('scPlanWrap').classList.add('hide'); $('scRun').classList.add('hide'); }
+['scCity','scDistricts','scSectors','scForce'].forEach(id=>$(id).addEventListener('input',()=>{ if(id==='scSectors') syncSectorChips(); if(!scanBusy) resetScanPlan(); }));
+const unitsToRun = (p, force) => p.units.filter(u=>u.status==='scan'||(force&&u.status==='recent'));
 
 $('scPlan').onclick = async ()=>{
   if(scanBusy) return;
   try{
     $('scPlan').disabled = true;
     const p = await callScan({ action:'plan', ...scanForm() });
-    scanPlan = p;
-    const box=$('scPlanBox'); box.replaceChildren(); box.classList.remove('hide');
-    const force=$('scForce').checked;
-    p.units.forEach(u=>{ const d=document.createElement('div'); d.className='u';
-      const a=document.createElement('span'); a.textContent=p.city+' / '+unitLabel(u);
-      const b=document.createElement('span'); b.textContent=UNIT_TR[u.status]; b.className=(u.status==='scan'||(force&&u.status==='recent'))?'ok':'muted'; d.append(a,b); box.appendChild(d); });
-    const todo = p.units.filter(u=>u.status==='scan'||(force&&u.status==='recent')).length;
-    const info=document.createElement('div'); info.className='meta'; info.style.marginTop='10px';
-    info.textContent = todo ? `${todo} bölge taranacak, en çok ${todo*3} Google çağrısı. Bugün ${p.usage.used}/${p.usage.limit} çağrı kullanıldı.` : 'Taranacak bölge yok.';
-    box.appendChild(info);
-    $('scRunRow').classList.toggle('hide', !todo);
-    $('scRun').textContent = `Taramayı başlat (${todo} bölge)`;
+    scanPlan = p; const force=$('scForce').checked, todo = unitsToRun(p, force).length;
+    const tiles=$('scTiles'); tiles.replaceChildren();
+    [[todo,'taranacak bölge'],[p.units.length-todo,'atlanacak'],[`${p.usage.used}/${p.usage.limit}`,'çağrı (bugün)']].forEach(([v,l])=>{
+      const t=el('div','tile'); t.append(el('b',null,String(v)), el('small',null,l)); tiles.appendChild(t); });
+    const m=el('div','meter'), i=el('i'); i.style.width=Math.min(100,Math.round(p.usage.used/p.usage.limit*100))+'%'; m.appendChild(i); tiles.lastChild.appendChild(m);
+    const box=$('scPlanBox'); box.replaceChildren();
+    p.units.forEach(u=>{ const d=el('div','u'); const run = u.status==='scan'||(force&&u.status==='recent');
+      d.append(el('span',null,p.city+' / '+unitLabel(u)), el('span','pill '+(run?'ok':'neutral'), run && u.status==='recent' ? 'yeniden taranacak' : UNIT_TR[u.status])); box.appendChild(d); });
+    $('scPlanWrap').classList.remove('hide');
+    const run=$('scRun'); run.classList.toggle('hide', !todo);
+    run.textContent = `Taramayı başlat · ${todo} bölge, en çok ${todo*3} çağrı`;
+    if(!todo) box.appendChild(el('div','muted','Taranacak bölge yok. Başka bölge/sektör deneyin ya da "yeniden tara"yı işaretleyin.'));
+    else if(todo > p.fits_today) box.appendChild(el('div','warn',p.fits_today>0
+      ? `Günlük Google sınırı (${p.usage.limit}) nedeniyle bugün en çok ~${p.fits_today} bölge taranabilir; kalanını yarın tarayın.`
+      : 'Bugünkü Google çağrı sınırı doldu. Yarın devam edin.'));
+    if(todo && !p.fits_today) run.classList.add('hide');
   }catch(e){ resetScanPlan(); toast(e.message); }
   finally{ $('scPlan').disabled=false; }
 };
 
 $('scRun').onclick = async ()=>{
   if(scanBusy || !scanPlan) return;
-  const force=$('scForce').checked;
-  const units = scanPlan.units.filter(u=>u.status==='scan'||(force&&u.status==='recent'));
+  const force=$('scForce').checked, units = unitsToRun(scanPlan, force);
   if(!units.length) return;
-  scanBusy=true; scanStop=false;
-  ['scCity','scDistricts','scSectors','scForce','scPlan'].forEach(id=>$(id).disabled=true);
-  $('scRunRow').classList.add('hide'); $('scProg').classList.remove('hide'); $('scStop').disabled=false; $('scLog').replaceChildren();
+  scanBusy=true; scanStop=false; setScanLocked(true);
+  $('scPlanWrap').classList.add('hide'); $('scProg').classList.remove('hide'); $('scStop').disabled=false; $('scLog').replaceChildren();
   let saved=0, found=0, done=0, calls=0, stopReason='';
-  const logLine=(t,cls)=>{ const d=document.createElement('div'); d.textContent=t; if(cls) d.className=cls; $('scLog').appendChild(d); };
+  const logLine=(t,cls)=>{ $('scLog').appendChild(el('div',cls,t)); };
   for(const u of units){
     if(scanStop){ stopReason='Durduruldu.'; break; }
-    $('scProgTxt').textContent = `${done+1}/${units.length}: ${scanPlan.city} / ${unitLabel(u)} taranıyor…`;
+    $('scProgTitle').textContent = `Taranıyor · ${done+1}/${units.length}`;
+    $('scProgTxt').textContent = `${scanPlan.city} / ${unitLabel(u)} · şu ana kadar ${saved} yeni`;
     try{
       const r = await callScan({ action:'run', city:scanPlan.city, district:u.district, sector:u.sector, force });
       if(r.skipped){ logLine(`${unitLabel(u)}: ${r.message}`,'muted'); }
@@ -460,9 +700,9 @@ $('scRun').onclick = async ()=>{
     }catch(e){ logLine(`${unitLabel(u)}: ${e.message}`,'bad'); stopReason='Hata nedeniyle durdu.'; break; }
     done++; $('scBar').style.width = Math.round(done/units.length*100)+'%';
   }
-  scanBusy=false; ['scCity','scDistricts','scSectors','scForce','scPlan'].forEach(id=>$(id).disabled=false);
+  scanBusy=false; setScanLocked(false);
   $('scProg').classList.add('hide'); $('scBar').style.width='0';
-  logLine(`${stopReason?stopReason+' ':''}Özet: ${found} bulundu, ${saved} yeni kaydedildi, ${calls} Google çağrısı.`, 'ok'); $('scLog').lastChild.style.fontWeight='600';
+  logLine(`${stopReason?stopReason+' ':''}Özet: ${found} bulundu, ${saved} yeni kaydedildi, ${calls} Google çağrısı.`, 'sum ok');
   resetScanPlan(); toast(saved?`${saved} yeni işletme eklendi`:'Yeni işletme eklenmedi');
   await Promise.all([loadScanHistory(), loadFilters(), refreshCounts()]);
 };
@@ -470,13 +710,12 @@ $('scStop').onclick = ()=>{ scanStop=true; $('scStop').disabled=true; $('scProgT
 
 async function loadScanHistory(){
   const { data, error } = await sb.from('scan_history').select('city,district,sector,scanned_at,places_found,saved').order('scanned_at',{ascending:false}).limit(10);
-  const tbl=$('scHist'); tbl.replaceChildren();
-  const head=tbl.insertRow(); ['Tarih','Bölge','Bulunan','Yeni'].forEach(x=>{const th=document.createElement('th'); th.textContent=x; head.appendChild(th);});
+  const ul=$('scHist'); ul.replaceChildren();
   if(error){ fail(error); return; }
-  (data||[]).forEach(h=>{ const r=tbl.insertRow();
-    r.insertCell().textContent=fmt(h.scanned_at);
-    r.insertCell().textContent=[h.city,h.district,h.sector].filter(Boolean).join(' / ');
-    r.insertCell().textContent=h.places_found; r.insertCell().textContent=h.saved; });
+  if(!(data||[]).length){ emptyLi(ul,'Henüz tarama yapılmadı.'); return; }
+  data.forEach(h=>{ const li=el('li');
+    const left=el('div'); left.append(el('div','t',[h.city,h.district,h.sector].filter(Boolean).join(' · ')), el('div','s',`${fmt(h.scanned_at)} · ${h.places_found} bulundu`));
+    li.append(left, el('span','pill '+(h.saved?'ok':'neutral'), `+${h.saved} yeni`)); ul.appendChild(li); });
 }
 
 // Oturum süresi dolarsa/çıkış yapılırsa giriş ekranına dön
