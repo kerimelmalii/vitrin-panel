@@ -84,7 +84,7 @@ python3 scan.py --city Ankara --districts "Çankaya" --sectors "kuaför"
 
 ## Panel
 
-Açık/koyu temaya kendiliğinden uyar; telefonda alt gezinme çubuğu, bilgisayarda üst menü kullanır. Üstteki halka haftalık hedefe (100) ilerlemeyi gösterir.
+vitrinweb. marka diliyle tasarlanmıştır (beyaz zemin, Manrope, lacivert vurgu; bkz. `docs/MARKA.md`). Telefonda alt gezinme çubuğu, bilgisayarda üst menü kullanır. Üstteki ince çubuk haftalık hedefe (100) ilerlemeyi gösterir.
 
 **Masaüstü kısayolları:** `W` WhatsApp'tan yaz, `S` şimdilik atla, `N` nota geç. (Sonuç düğmeleri yanlışlıkla basılmasın diye kısayolsuzdur.)
 
@@ -114,7 +114,7 @@ Açık/koyu temaya kendiliğinden uyar; telefonda alt gezinme çubuğu, bilgisay
 python3 -m unittest tests.test_scan                  # tarama mantığı (Python)
 node --test tests/scan_edge.test.mjs                 # panelden tarama servisi (Node 22+)
 node tests/panel.e2e.mjs                             # panel, gerçek tarayıcıda (playwright gerekir)
-#   ekran görüntüsü: SHOTS=klasör  ·  koyu tema: SCHEME=dark  ·  masaüstü: VIEW=1280x860
+#   ekran görüntüsü: SHOTS=klasör  ·  masaüstü: VIEW=1280x860
 #   erişilebilirlik taraması: AXE=node_modules/axe-core/axe.min.js (npm i axe-core)
 PGHOST=... PGUSER=postgres tests/run_sql_tests.sh    # şema + iş kuralları, boş bir Postgres'e karşı
 ```
