@@ -13,6 +13,44 @@ def place(**kw):
     return p
 
 
+class Title(unittest.TestCase):
+    def test_tr_title(self):
+        self.assertEqual(scan.tr_title("çankaya"), "Çankaya")
+        self.assertEqual(scan.tr_title("ISPARTA"), "Isparta")
+        self.assertEqual(scan.tr_title("iğdır merkez"), "İğdır Merkez")
+        self.assertEqual(scan.tr_title("İZMİR"), "İzmir")
+
+
+class Fixtures(unittest.TestCase):
+    """Edge Function (TypeScript) ile aynı sonuçları vermek zorunda: ortak test verisi."""
+    cases = json.load(open(os.path.join(os.path.dirname(__file__), "scan_cases.json"), encoding="utf-8"))
+
+    def test_phones(self):
+        for raw, exp in self.cases["phones"]:
+            self.assertEqual(scan.normalize_phone(raw), exp, raw)
+
+    def test_websites(self):
+        for uri, exp in self.cases["websites"]:
+            self.assertEqual(scan.classify_website(uri), exp, uri)
+
+    def test_scores(self):
+        for r, n, w, m, exp in self.cases["scores"]:
+            self.assertEqual(scan.lead_score(r, n, w, m), exp, (r, n, w, m))
+
+    def test_places(self):
+        for k in self.cases["places"]:
+            row, why = scan.place_to_row(place(**k["place"]), k["city"], k["district"], k["sector"])
+            if k.get("ok"):
+                self.assertIsNotNone(row, (k["name"], why))
+            else:
+                self.assertIsNone(row, k["name"])
+                self.assertEqual(why, k["why"], k["name"])
+            if row and "phone" in k:
+                self.assertEqual(row["phone_normalized"], k["phone"])
+            if row and "website" in k:
+                self.assertEqual(row["website_status"], k["website"])
+
+
 class Phone(unittest.TestCase):
     def test_formats(self):
         for raw in ("0532 111 22 33", "+90 532 111 22 33", "(0532) 111-22-33", "5321112233", "00905321112233"):

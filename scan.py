@@ -52,6 +52,15 @@ def tr_lower(s):
     return (s or "").replace("İ", "i").replace("I", "ı").lower()
 
 
+def tr_title(s):
+    """Her kelimenin ilk harfi Türkçe kurallarıyla büyük: 'çankaya' -> 'Çankaya'."""
+    out = []
+    for w in tr_lower(s).split():
+        first = "İ" if w[0] == "i" else "I" if w[0] == "ı" else w[0].upper()
+        out.append(first + w[1:])
+    return " ".join(out)
+
+
 def normalize_phone(raw):
     """Türkiye numarasını +90XXXXXXXXXX biçimine çevirir; geçersizse None."""
     digits = "".join(ch for ch in (raw or "") if ch.isdigit())
@@ -94,7 +103,7 @@ def lead_score(rating, reviews, website_status, mobile):
     s += min(reviews, 150) / 150 * 30
     s += 25 if website_status == "none" else 15
     s += 15 if mobile else 0
-    return round(s)
+    return int(s + 0.5)   # yarıyı yukarı yuvarla (TypeScript sürümüyle aynı sonuç)
 
 
 def place_to_row(place, city, district, sector):
@@ -271,8 +280,10 @@ def main(argv=None):
     since = (datetime.now(timezone.utc) - timedelta(days=RESCAN_DAYS)).isoformat()
     history = supa.get("/scan_history?select=city,district,sector,scanned_at&scanned_at=gte." + urllib.parse.quote(since))
 
-    districts = [d.strip() for d in a.districts.split(",") if d.strip()] or [""]
-    sectors = [s.strip() for s in a.sectors.split(",") if s.strip()]
+    # Panelle aynı yazım: filtrelerde aynı şehir/ilçe/sektör iki kez görünmesin
+    a.city = tr_title(a.city)
+    districts = [tr_title(d) for d in a.districts.split(",") if d.strip()] or [""]
+    sectors = [tr_lower(s.strip()) for s in a.sectors.split(",") if s.strip()]
     budget = {"left": a.max_queries}
     total_saved = total_found = total_calls = 0
 

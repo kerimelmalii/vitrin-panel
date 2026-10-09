@@ -1,0 +1,53 @@
+{
+  "phones": [
+    ["0532 111 22 33", "+905321112233"],
+    ["+90 532 111 22 33", "+905321112233"],
+    ["(0532) 111-22-33", "+905321112233"],
+    ["5321112233", "+905321112233"],
+    ["00905321112233", "+905321112233"],
+    ["(0312) 123 45 67", "+903121234567"],
+    ["0212 555 00 11", "+902125550011"],
+    ["444 1 234", null],
+    ["0850 123 45 67", null],
+    ["0800 123 45 67", null],
+    ["0532 111 22", null],
+    ["", null],
+    [null, null]
+  ],
+  "websites": [
+    [null, "none"],
+    ["", "none"],
+    ["https://www.instagram.com/guzelkuafor", "social_only"],
+    ["https://m.facebook.com/x", "social_only"],
+    ["http://linktr.ee/x", "social_only"],
+    ["instagram.com/x", "social_only"],
+    ["https://guzelkuafor.com", "has_site"],
+    ["https://notinstagram.com", "has_site"],
+    ["https://fakex.com", "has_site"],
+    ["https://x.com.tr", "has_site"]
+  ],
+  "scores": [
+    [5.0, 150, "none", true, 100],
+    [4.3, 10, "social_only", false, 17],
+    [4.7, 80, "none", true, 73],
+    [4.9, 211, "none", true, 96]
+  ],
+  "places": [
+    {"name": "geçer", "city": "Ankara", "district": "Çankaya", "sector": "kuaför", "place": {}, "ok": true, "phone": "+905321112233", "website": "none"},
+    {"name": "düşük puan", "city": "Ankara", "district": "Çankaya", "sector": "kuaför", "place": {"rating": 4.2}, "why": "puan düşük"},
+    {"name": "az yorum", "city": "Ankara", "district": "Çankaya", "sector": "kuaför", "place": {"userRatingCount": 9}, "why": "yorum aralık dışı"},
+    {"name": "çok yorum", "city": "Ankara", "district": "Çankaya", "sector": "kuaför", "place": {"userRatingCount": 301}, "why": "yorum aralık dışı"},
+    {"name": "sitesi var", "city": "Ankara", "district": "Çankaya", "sector": "kuaför", "place": {"websiteUri": "https://x.com.tr"}, "why": "sitesi var"},
+    {"name": "telefon yok", "city": "Ankara", "district": "Çankaya", "sector": "kuaför", "place": {"nationalPhoneNumber": null}, "why": "telefon yok/geçersiz"},
+    {"name": "kapalı", "city": "Ankara", "district": "Çankaya", "sector": "kuaför", "place": {"businessStatus": "CLOSED_PERMANENTLY"}, "why": "kapalı"},
+    {"name": "bölge dışı", "city": "Ankara", "district": "Çankaya", "sector": "kuaför", "place": {"formattedAddress": "Moda, Kadıköy/İstanbul, Türkiye"}, "why": "bölge dışı"},
+    {"name": "puan yok", "city": "Ankara", "district": "Çankaya", "sector": "kuaför", "place": {"rating": null}, "why": "puan yok"},
+    {"name": "sınır 4.3", "city": "Ankara", "district": "Çankaya", "sector": "kuaför", "place": {"rating": 4.3}, "ok": true},
+    {"name": "sınır 10", "city": "Ankara", "district": "Çankaya", "sector": "kuaför", "place": {"userRatingCount": 10}, "ok": true},
+    {"name": "sınır 300", "city": "Ankara", "district": "Çankaya", "sector": "kuaför", "place": {"userRatingCount": 300}, "ok": true},
+    {"name": "sosyal medya", "city": "Ankara", "district": "Çankaya", "sector": "kuaför", "place": {"websiteUri": "https://instagram.com/x"}, "ok": true, "website": "social_only"},
+    {"name": "büyük harf adres", "city": "Ankara", "district": "Çankaya", "sector": "kuaför", "place": {"formattedAddress": "X Cd, ÇANKAYA/ANKARA, Türkiye"}, "ok": true},
+    {"name": "İzmir adres", "city": "İzmir", "district": "Bornova", "sector": "kuaför", "place": {"formattedAddress": "X Cd, Bornova/İZMİR"}, "ok": true},
+    {"name": "ilçesiz şehir", "city": "Ankara", "district": "", "sector": "kuaför", "place": {}, "ok": true}
+  ]
+}
