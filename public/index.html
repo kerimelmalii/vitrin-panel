@@ -354,7 +354,7 @@
             <button class="link" id="toCallList">Arama listesine al</button>
           </div>
           <div id="tplBox" class="hide">
-            <label for="tplText">Mesaj şablonu ({isim} işletme adıyla değişir; "dur" cümlesini silme)</label>
+            <label for="tplText">Mesaj şablonu ({isim} işletme adıyla değişir; "iptal" cümlesini silme)</label>
             <textarea id="tplText"></textarea>
             <div class="row2" style="margin-top:8px"><button class="btn" id="tplReset">Varsayılana dön</button><button class="btn primary" id="tplSave">Kaydet</button></div>
           </div>
@@ -389,7 +389,7 @@
             <summary>Listeden çıkar</summary>
             <div class="grid2">
               <button class="btn neg" data-o="rejected">İlgilenmiyor</button>
-              <button class="btn neg" data-o="do_not_contact">Dur dedi / bir daha yazma</button>
+              <button class="btn neg" data-o="do_not_contact">İptal dedi / bir daha yazma</button>
               <button class="btn" data-o="wrong_number">Yanlış numara</button>
               <button class="btn" data-o="closed_business">İşletme kapalı</button>
             </div>
@@ -552,7 +552,7 @@ const WA_DAILY_LIMIT    = 25;   // önerilen günlük üst sınır (engellemez, 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const $ = id => document.getElementById(id);
 const OUTCOME_TR = {wa_sent:'WhatsApp gönderildi', no_answer:'Açmadı', callback:'Sonra aranacak', interested:'İlgilendi', won:'Satış',
-  rejected:'İlgilenmiyor', do_not_contact:'Dur dedi / aramayın', wrong_number:'Yanlış numara', closed_business:'Kapalı'};
+  rejected:'İlgilenmiyor', do_not_contact:'İptal dedi / yazmayın', wrong_number:'Yanlış numara', closed_business:'Kapalı'};
 const OUTCOME_CLS = {wa_sent:'ok', no_answer:'warn', callback:'info', interested:'ok', won:'ok', rejected:'bad', do_not_contact:'bad', wrong_number:'neutral', closed_business:'neutral'};
 const WEB_TR = {none:'Web sitesi yok', social_only:'Sadece sosyal medya'};
 const LISTS = ['whatsapp','call','followup'];
@@ -707,8 +707,8 @@ $('emptyScan').onclick = ()=>tab('scan');
 $('emptyOther').onclick = ()=>{ const next = LISTS.find(l=>l!==list && counts[l]) || LISTS[(LISTS.indexOf(list)+1)%3]; tab(next); };
 
 // ---- WhatsApp (yarı elle) ----
-const DEFAULT_TPL = "Merhaba,\n\nÖncelikle umarım iyisinizdir ve her şey yolundadır.\n\nİşletmenizin Google Haritalar'daki yüksek puanını ve olumlu müşteri yorumlarını gördük; ancak işletmenize ait bir web sitesi bulunmadığını fark ettik.\n\nVitrinweb olarak yerel işletmelere, 5 iş günü içinde yayına alabilecekleri, mobil uyumlu ve profesyonel web siteleri hazırlıyoruz.\n\nÖdemelerinizi Türkiye'nin güvenilir ödeme altyapılarından iyzico üzerinden güvenle gerçekleştirebilirsiniz; kart bilgileriniz tarafımızca saklanmaz.\n\nSizi https://www.vitrinweb.com.tr adresini ziyaret etmeye davet ediyoruz. Paket içeriğini ve tüm detayları sitemizde ve ekteki broşürde inceleyebilirsiniz. Sorularınız için telefon numaramızdan, e-posta adresimizden veya sitemizdeki iletişim bölümünden bize ulaşabilirsiniz.\n\nSaygılarımızla,\nVitrinweb\n\nKurumsal Mailimiz: iletisim@vitrinweb.com.tr\nTelefon Numaramız: 0538 629 94 90\n\nBizden mesaj almak istemiyorsanız \"dur\" yazmanız yeterli, bir daha yazmayacağız.";
-const TPL_KEY = 'vitrin_wa_tpl_v3';   // şablon değişince sürüm artar; eski kayıtlı metin devreye girmez
+const DEFAULT_TPL = "Merhaba,\n\nÖncelikle umarım iyisinizdir ve her şey yolundadır.\n\nİşletmenizin Google Haritalar'daki yüksek puanını ve olumlu müşteri yorumlarını gördük; ancak işletmenize ait bir web sitesi bulunmadığını fark ettik.\n\nVitrinweb olarak yerel işletmelere, 5 iş günü içinde yayına alabilecekleri, mobil uyumlu ve profesyonel web siteleri hazırlıyoruz.\n\nÖdemelerinizi Türkiye'nin güvenilir ödeme altyapılarından iyzico üzerinden güvenle gerçekleştirebilirsiniz; kart bilgileriniz tarafımızca saklanmaz.\n\nSizi https://www.vitrinweb.com.tr adresini ziyaret etmeye davet ediyoruz. Paket içeriğini ve tüm detayları sitemizde ve ekteki broşürde inceleyebilirsiniz. Sorularınız için telefon numaramızdan, e-posta adresimizden veya sitemizdeki iletişim bölümünden bize ulaşabilirsiniz.\n\nSaygılarımızla,\nVitrinweb\n\nKurumsal Mailimiz: iletisim@vitrinweb.com.tr\nTelefon Numaramız: 0538 629 94 90\n\nBizden mesaj almak istemiyorsanız \"iptal\" yazmanız yeterli, bir daha yazmayacağız.";
+const TPL_KEY = 'vitrin_wa_tpl_v4';   // şablon değişince sürüm artar; eski kayıtlı metin devreye girmez
 function getTpl(){ try{ return localStorage.getItem(TPL_KEY) || DEFAULT_TPL; }catch(e){ return DEFAULT_TPL; } }
 function setTpl(v){ try{ v ? localStorage.setItem(TPL_KEY,v) : localStorage.removeItem(TPL_KEY); }catch(e){} }
 function shortName(n){
@@ -740,7 +740,7 @@ $('tplToggle').onclick = ()=>{ $('tplText').value = getTpl(); $('tplBox').classL
 $('tplReset').onclick  = ()=>{ setTpl(null); $('tplText').value = DEFAULT_TPL; toast('Varsayılan mesaj yüklendi'); };
 $('tplSave').onclick   = ()=>{
   const v=$('tplText').value.trim();
-  if(!/dur/i.test(v)){ toast('Mesajda "dur" yazarak vazgeçme cümlesi kalmalı'); return; }
+  if(!/iptal/i.test(v)){ toast('Mesajda "iptal" yazarak vazgeçme cümlesi kalmalı'); return; }
   setTpl(v===DEFAULT_TPL?null:v); $('tplBox').classList.add('hide'); toast('Mesaj şablonu kaydedildi');
 };
 
