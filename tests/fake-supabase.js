@@ -22,7 +22,7 @@
     B({ id: 'f1', name: 'Takip Eczane', sector: 'eczane', status: 'callback', lead_score: 95, attempt_count: 1, phone_raw: '0534 000 00 00', phone_normalized: '+905340000000' }),
   ];
   const isMobile = b => /^\+905\d{9}$/.test(b.phone_normalized);
-  const lstOf = b => b.status === 'callback' || b.status === 'wa_sent' ? 'followup' : b.status === 'new' ? ((!isMobile(b) || b.call_list) ? 'call' : 'whatsapp') : null;
+  const lstOf = b => b.status === 'wa_sent' ? 'sent' : b.status === 'callback' ? 'followup' : b.status === 'new' ? ((!isMobile(b) || b.call_list) ? 'call' : 'whatsapp') : null;
   const log = [];
 
   let seq = 10;
@@ -52,7 +52,7 @@
       b.status = a.p_outcome; b.attempt_count++; log.push({ ...a });
       if (a.p_outcome === 'won') { const id = 'c' + (++seq); customers.unshift({ id, business_id: b.id, name: b.name, phone: b.phone_raw, city: b.city, sector: b.sector, stage: 'sale_done', amount: null, domain: null, next_step: null, next_step_at: null, stage_changed_at: now() }); addNote(id, 'created', 'Satış kaydedildi' + (a.p_note ? '\n' + a.p_note : '')); }
       return null; }),
-    list_counts: needs('leads', a => ['whatsapp', 'call', 'followup'].map(l => ({ lst: l, n: biz.filter(b => lstOf(b) === l && (!a.p_city || b.city === a.p_city) && (!a.p_sector || b.sector === a.p_sector)).length })).filter(r => r.n)),
+    list_counts: needs('leads', a => ['whatsapp', 'call', 'followup', 'sent'].map(l => ({ lst: l, n: biz.filter(b => lstOf(b) === l && (!a.p_city || b.city === a.p_city) && (!a.p_sector || b.sector === a.p_sector)).length })).filter(r => r.n)),
     filter_options: needs('leads', () => [...new Map(biz.filter(lstOf).map(b => [b.city + b.sector, { city: b.city, sector: b.sector }])).values()]),
     stats: needs('leads', () => [{ week_total: log.length + 7, week_wa: 3, today_total: log.length, today_wa: log.filter(l => l.p_outcome === 'wa_sent').length }]),
     search_history: needs('leads', a => log.filter(l => !a.p_term || JSON.stringify(l).includes(a.p_term)).map(l => ({ called_at: now(), outcome: l.p_outcome, note: l.p_note, name: biz.find(b => b.id === l.p_business_id).name, phone_raw: 'x', city: 'Ankara' }))),

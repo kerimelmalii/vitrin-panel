@@ -203,12 +203,14 @@ grant select on public.businesses, public.calls, public.closed_regions, public.s
 --  whatsapp : yeni + cep numarası + arama listesine alınmamış
 --  call     : yeni + (sabit hat veya arama listesine alınmış), ya da açmayan (en çok 3 deneme) vadesi gelmiş
 --  followup : vadesi gelen "sonra ara", WhatsApp'ı 3 gün önce gidenler, ilgilenenler
+--  sent     : WhatsApp'ı son 3 günde gönderilenler (dönüş olursa sonucu değiştirmek için)
 drop view if exists public.v_queue;
 create view public.v_queue with (security_invoker = true) as
 select b.*,
   case
     when b.status = 'callback'                 and b.next_action_at <= now() then 'followup'
     when b.status in ('wa_sent','interested')  and b.next_action_at <= now() then 'followup'
+    when b.status = 'wa_sent'                  and b.next_action_at >  now() then 'sent'
     when b.status = 'no_answer' and b.no_answer_count < 3 and b.next_action_at <= now() then 'call'
     when b.status = 'new' and (not b.is_mobile or b.call_list) then 'call'
     when b.status = 'new' then 'whatsapp'
@@ -244,7 +246,7 @@ language plpgsql security definer set search_path = public as $$
 declare uid uuid := auth.uid(); v public.businesses; cand uuid; tries int := 0;
 begin
   if uid is null or not public.has_perm('leads') then raise exception 'Bu işlem için yetkiniz yok'; end if;
-  if p_list not in ('whatsapp','call','followup') then raise exception 'Geçersiz liste'; end if;
+  if p_list not in ('whatsapp','call','followup','sent') then raise exception 'Geçersiz liste'; end if;
   loop
     tries := tries + 1;
     -- Başkasının son 15 dk içinde açtığı kart atlanır; kendi açık kartım önce gelir
@@ -255,6 +257,7 @@ begin
        and (q.claimed_by is null or q.claimed_by = uid or q.claimed_at < now() - interval '15 minutes')
        and not (q.id = any (coalesce(p_skip, '{}')))
      order by (q.claimed_by = uid) desc nulls last,
+              (case when p_list = 'sent' then q.updated_at end) desc nulls last,
               (q.status = 'callback') desc,
               q.next_action_at asc nulls last,
               q.lead_score desc, q.created_at asc

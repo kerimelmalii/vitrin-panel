@@ -82,7 +82,7 @@ assert.equal(await txt('#n_lists'), '4'); ok('liste sayaçları 2/1/1, toplam ro
 assert.equal(await txt('#weekCount'), '7'); ok('haftalık sayaç sunucudan');
 await page.click('#waBtn');
 const url = (await page.evaluate(() => window.__opened))[0];
-assert.ok(url.startsWith('https://wa.me/905321112233?text='), url);
+assert.ok(url.startsWith('https://web.whatsapp.com/send?phone=905321112233&text='), url);
 const msg = decodeURIComponent(url.split('text=')[1]);
 assert.ok(msg.startsWith('Merhaba,') && msg.includes('"iptal" yazmanız') && msg.includes('ekteki broşürde'), msg); ok('WhatsApp linki: numara + varsayılan mesaj + "iptal" cümlesi');
 assert.equal(await vis('#brBtn'), true); await page.click('#brBtn');
@@ -92,6 +92,12 @@ assert.equal(await count('move_to_call_list'), 1); assert.match(await txt('#n_ca
 assert.equal(await vis('#bMaps'), false); ok('javascript: harita bağlantısı gizlendi');
 await page.click('#btnWaSent'); await page.waitForFunction(() => !document.getElementById('empty').classList.contains('hide'));
 await shot('03-bos'); assert.equal((await last('log_call'))[1].p_outcome, 'wa_sent'); assert.equal(await txt('#waToday'), '1'); ok('WhatsApp gönderildi kaydedildi, sayaç arttı, boş durum');
+
+assert.equal(await txt('#n_sent'), '1');
+await page.click('[data-tab="sent"]'); await page.waitForFunction(() => document.getElementById('bName').textContent === 'Yeşil Berber');
+await page.fill('#note', 'geri döndü'); await page.click('[data-o="interested"]');
+await page.waitForFunction(() => !document.getElementById('empty').classList.contains('hide'));
+assert.equal((await last('log_call'))[1].p_outcome, 'interested'); ok('Gönderildi sekmesi: gönderilen kayıt açılıp sonucu değiştirilebiliyor');
 
 await page.click('[data-tab="call"]'); await page.waitForFunction(() => document.getElementById('bName').textContent.startsWith('Mavi'));
 assert.equal(await vis('#toCallList'), false); ok('arama listesine alınan cep numarası Arama sekmesinde');
@@ -114,14 +120,14 @@ await page.waitForFunction(() => document.getElementById('n_customers').textCont
 
 // kalıcı çıkarma: özel onay penceresi
 await page.waitForFunction(() => document.getElementById('bName').textContent === 'Sabit Diş');
-await page.click('#closeMenu summary'); await page.click('[data-o="do_not_contact"]');
-await page.waitForSelector('#dlg[open]'); assert.match(await txt('#dlgText'), /Sabit Diş/); await shot('04-onay');
-await page.click('#dlgOk'); await page.waitForFunction(() => document.getElementById('bName').textContent !== 'Sabit Diş');
-assert.equal((await last('log_call'))[1].p_outcome, 'do_not_contact'); ok('"iptal dedi" özel onay penceresiyle kaydedildi');
 { const before = await count('log_call');
   await page.click('#closeMenu summary'); await page.click('[data-o="rejected"]'); await page.waitForSelector('#dlg[open]');
   await page.click('#dlg button[value="cancel"]'); await page.waitForFunction(() => !document.getElementById('dlg').open);
   assert.equal(await count('log_call'), before); ok('onayda "Vazgeç" kaydı engeller'); }
+await page.click('[data-o="do_not_contact"]');
+await page.waitForSelector('#dlg[open]'); assert.match(await txt('#dlgText'), /Sabit Diş/); await shot('04-onay');
+await page.click('#dlgOk'); await page.waitForFunction(() => !document.getElementById('empty').classList.contains('hide'));
+assert.equal((await last('log_call'))[1].p_outcome, 'do_not_contact'); ok('"iptal dedi" özel onay penceresiyle kaydedildi');
 
 // =============================================================== MÜŞTERİLER
 await page.click('[data-nav="customers"]'); await page.waitForSelector('.cust');
@@ -222,7 +228,7 @@ assert.equal((await last('set_user_role'))[1].p_role, 'none'); ok('yetki kaldır
 
 // =============================================================== GEÇMİŞ, ÇIKIŞ
 await page.click('[data-nav="hist"]'); await page.waitForSelector('#histList li');
-assert.equal(await page.locator('#histList li').count(), 4); await shot('11-gecmis'); await axe('geçmiş'); ok('geçmiş listesi dolu');
+assert.equal(await page.locator('#histList li').count(), 5); await shot('11-gecmis'); await axe('geçmiş'); ok('geçmiş listesi dolu');
 await page.fill('#histSearch', 'meşgul'); await page.waitForTimeout(500);
 assert.ok((await calls()).some(c => c[0] === 'search_history' && c[1].p_term === 'meşgul')); ok('geçmişte arama sunucuya gider');
 await page.click('#logout'); await page.waitForSelector('#login:not(.hide)'); ok('çıkış giriş ekranına döner');
