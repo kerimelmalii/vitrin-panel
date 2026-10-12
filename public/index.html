@@ -315,7 +315,11 @@
         <button data-tab="followup">Takip<span class="n" id="n_followup"></span></button>
         <button data-tab="sent">Gönderildi<span class="n" id="n_sent"></span></button>
       </div>
-      <div class="filters">
+      <div id="sentBox" class="hide">
+        <input id="sentSearch" type="search" placeholder="İşletme adı veya telefon ara…" aria-label="Gönderilenlerde ara" style="margin-bottom:12px;background:var(--card);border-color:var(--line)">
+        <div class="card" style="padding:8px 20px"><ul class="list" id="sentList"></ul></div>
+      </div>
+      <div class="filters" id="filtersBox">
         <select id="cityFilter" aria-label="Şehir filtresi"><option value="">Tüm şehirler</option></select>
         <select id="sectorFilter" aria-label="Sektör filtresi"><option value="">Tüm sektörler</option></select>
       </div>
@@ -397,6 +401,7 @@
           </details>
         </div>
         <button class="link skip" id="skip">Şimdilik atla <kbd>S</kbd></button>
+        <button class="link skip hide" id="backSent">← Listeye dön</button>
       </article>
     </section>
 
@@ -647,7 +652,7 @@ async function loadFilters(){
   const fill=(sel,items,all)=>{ const v=sel.value; sel.replaceChildren(new Option(all,'')); items.forEach(x=>sel.add(new Option(x,x))); sel.value=items.includes(v)?v:''; };
   fill($('cityFilter'),uniq('city'),'Tüm şehirler'); fill($('sectorFilter'),uniq('sector'),'Tüm sektörler');
 }
-$('cityFilter').onchange = $('sectorFilter').onchange = async ()=>{ await release(); skipped.clear(); await Promise.all([refreshCounts(), loadNext()]); };
+$('cityFilter').onchange = $('sectorFilter').onchange = async ()=>{ if(list==='sent') return; await release(); skipped.clear(); await Promise.all([refreshCounts(), loadNext()]); };
 
 // ---- Sayaçlar ----
 async function refreshCounts(){
@@ -673,9 +678,10 @@ async function refreshCounts(){
 }
 
 // ---- Sıradaki işletme (sunucu seçer ve 15 dk kilitler: iki kişi aynı kartı görmez) ----
-function showState(state){   // 'skel' | 'biz' | 'empty' | 'err'
+function showState(state){   // 'skel' | 'biz' | 'empty' | 'err' | 'list'
   $('skel').classList.toggle('hide',state!=='skel'); $('biz').classList.toggle('hide',state!=='biz');
   $('empty').classList.toggle('hide',state!=='empty'); $('loadErr').classList.toggle('hide',state!=='err');
+  $('sentBox').classList.toggle('hide', !(list==='sent' && state==='list'));
 }
 function scoreView(n){ return n>=80 ? ['hot','Sıcak'] : n>=60 ? ['good','İyi'] : ['mid','Orta']; }
 function addTag(parent, text, cls, icon){ const s=el('span','tag'+(cls?' '+cls:'')); if(icon) s.innerHTML=icon; s.append(text); parent.appendChild(s); }
@@ -690,6 +696,9 @@ async function loadNext(){
   if(r.error){ showState('err'); $('loadErrTxt').textContent = r.error.message || 'Bağlantıyı kontrol edip tekrar dene.'; console.error(r.error); return; }
   const pick = (r.data||[])[0];
   if(!pick){ showState('empty'); return; }
+  await renderBiz(pick, my);
+}
+async function renderBiz(pick, my){
   current = pick; showState('biz');
   $('bName').textContent = pick.name;
   $('bAddr').textContent = pick.address || '';
@@ -701,6 +710,9 @@ async function loadNext(){
   addTag(tags, pick.sector); addTag(tags, [pick.city,pick.district].filter(Boolean).join(' / '));
   const ph=$('bPhone'); ph.textContent = pick.phone_raw; ph.href = 'tel:'+(pick.phone_normalized||''); $('callBtn').href = ph.href;
   setupWa(pick); $('tplBox').classList.add('hide');
+  const sentM = list==='sent';                  // Gönderildi listesinden açıldıysa: tekrar "gönderdim"/atla yok, listeye dönüş var
+  $('skip').classList.toggle('hide', sentM); $('backSent').classList.toggle('hide', !sentM);
+  if(sentM){ $('btnWaSent').classList.add('hide'); $('toCallList').classList.add('hide'); }
   const okMaps=/^https:\/\//.test(pick.maps_url||''); const mp=$('bMaps'); mp.href = okMaps ? pick.maps_url : '#'; mp.classList.toggle('hide',!okMaps);
   const h=$('bHistory'); h.replaceChildren();
   if(pick.attempt_count>0){
@@ -710,7 +722,7 @@ async function loadNext(){
     if(h.firstChild) h.firstChild.textContent = 'Önceki: ' + h.firstChild.textContent;
   }
 }
-$('retry').onclick = loadNext;
+$('retry').onclick = ()=> list==='sent' ? loadSent() : loadNext();
 $('emptyScan').onclick = ()=>tab('scan');
 $('emptyOther').onclick = ()=>{ const next = LISTS.find(l=>l!==list && counts[l]) || LISTS[(LISTS.indexOf(list)+1)%3]; tab(next); };
 
@@ -810,6 +822,7 @@ async function save(outcome, callbackAt){
   if(error){ toast('Kaydedilemedi: '+error.message); return; }
   toast(outcome==='won' ? 'Satış kaydedildi, Müşteriler sekmesine eklendi' : 'Kaydedildi: '+OUTCOME_TR[outcome]);
   if(outcome==='won' && can('customers')) loadCustomerBadge();
+  if(list==='sent'){ current=null; await Promise.all([refreshCounts(), loadSent()]); return; }
   await Promise.all([refreshCounts(), loadNext()]);
 }
 function cbDate(kind){
@@ -862,11 +875,41 @@ async function tab(which){
   if(which==='scan') return loadScanHistory();
   if(which==='customers') return loadCustomers();
   if(which==='team') return loadTeam();
-  list = which; skipped.clear(); showState('skel');
+  list = which; skipped.clear();
+  $('filtersBox').classList.toggle('hide', which==='sent'); $('sentBox').classList.toggle('hide', which!=='sent');
+  if(which==='sent'){ current=null; $('cbBox').classList.add('hide'); $('note').value=''; $('closeMenu').open=false; showState('skel'); await Promise.all([refreshCounts(), loadSent()]); return; }
+  showState('skel');
   await Promise.all([loadFilters(), refreshCounts(), loadNext()]);
 }
 navBtns().forEach(b=>b.addEventListener('click',()=>tab(b.dataset.nav==='lists' ? list : b.dataset.nav)));
 document.querySelectorAll('#listSeg [data-tab]').forEach(b=>b.addEventListener('click',()=>tab(b.dataset.tab)));
+
+// ---- Gönderildi: aranabilir liste, satıra tıklayınca kart açılır ----
+let sentRows = [];
+const digits = x => (x||'').replace(/\D/g,'');
+function renderSent(){
+  const term = trLower($('sentSearch').value.trim()), dg = digits($('sentSearch').value);
+  const ul=$('sentList'); ul.replaceChildren();
+  const rows = sentRows.filter(r => !term || trLower(r.name).includes(term) || (dg.length>=3 && digits(r.phone_raw).includes(dg)));
+  if(!rows.length){ emptyLi(ul, sentRows.length ? 'Sonuç bulunamadı.' : 'Gönderilen kayıt yok.'); return; }
+  rows.forEach(r=>{
+    const li=el('li'); li.style.cursor='pointer'; li.tabIndex=0; li.setAttribute('role','button');
+    const left=el('div'); left.append(el('div','t',r.name), el('div','s',[r.phone_raw, [r.city,r.district].filter(Boolean).join(' / ')].filter(Boolean).join(' · ')));
+    li.append(left, el('span','s',fmt(r.updated_at)));
+    const open=()=>openSent(r);
+    li.onclick=open; li.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); open(); } };
+    ul.appendChild(li);
+  });
+}
+async function loadSent(){
+  showState('list');
+  const r = await sb.from('v_queue').select('*').eq('lst','sent').order('updated_at',{ascending:false}).limit(500);
+  if(r.error){ showState('err'); $('loadErrTxt').textContent = r.error.message; return; }
+  sentRows = r.data||[]; renderSent();
+}
+async function openSent(row){ $('cbBox').classList.add('hide'); $('note').value=''; $('closeMenu').open=false; await renderBiz(row, ++seq); window.scrollTo(0,0); }
+let sTimer; $('sentSearch').oninput=()=>{ clearTimeout(sTimer); sTimer=setTimeout(renderSent,150); };
+$('backSent').onclick = ()=>{ current=null; loadSent(); };
 
 // ---- Geçmiş ----
 let hTimer; $('histSearch').oninput=()=>{ clearTimeout(hTimer); hTimer=setTimeout(loadHistory,300); };
