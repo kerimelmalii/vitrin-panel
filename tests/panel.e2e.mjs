@@ -94,10 +94,17 @@ await page.click('#btnWaSent'); await page.waitForFunction(() => !document.getEl
 await shot('03-bos'); assert.equal((await last('log_call'))[1].p_outcome, 'wa_sent'); assert.equal(await txt('#waToday'), '1'); ok('WhatsApp gönderildi kaydedildi, sayaç arttı, boş durum');
 
 assert.equal(await txt('#n_sent'), '1');
-await page.click('[data-tab="sent"]'); await page.waitForFunction(() => document.getElementById('bName').textContent === 'Yeşil Berber');
+await page.click('[data-tab="sent"]'); await page.waitForSelector('#sentList li[role="button"]');
+assert.equal(await page.locator('#sentList li[role="button"]').count(), 1); assert.equal(await vis('#biz'), false);
+await page.fill('#sentSearch', 'xyz'); await page.waitForFunction(() => /Sonuç bulunamadı/.test(document.getElementById('sentList').textContent));
+await page.fill('#sentSearch', '0533 222'); await page.waitForSelector('#sentList li[role="button"]');
+await page.click('#sentList li[role="button"]'); await page.waitForFunction(() => document.getElementById('bName').textContent === 'Yeşil Berber');
+assert.equal(await vis('#btnWaSent'), false); assert.equal(await vis('#skip'), false); assert.equal(await vis('#backSent'), true);
+await page.click('#backSent'); await page.waitForSelector('#sentList li[role="button"]'); assert.equal(await vis('#biz'), false);
+await page.click('#sentList li[role="button"]'); await page.waitForFunction(() => document.getElementById('bName').textContent === 'Yeşil Berber');
 await page.fill('#note', 'geri döndü'); await page.click('[data-o="interested"]');
-await page.waitForFunction(() => !document.getElementById('empty').classList.contains('hide'));
-assert.equal((await last('log_call'))[1].p_outcome, 'interested'); ok('Gönderildi sekmesi: gönderilen kayıt açılıp sonucu değiştirilebiliyor');
+await page.waitForFunction(() => /Gönderilen kayıt yok/.test(document.getElementById('sentList').textContent));
+assert.equal((await last('log_call'))[1].p_outcome, 'interested');ok('Gönderildi sekmesi: gönderilen kayıt açılıp sonucu değiştirilebiliyor');
 
 await page.click('[data-tab="call"]'); await page.waitForFunction(() => document.getElementById('bName').textContent.startsWith('Mavi'));
 assert.equal(await vis('#toCallList'), false); ok('arama listesine alınan cep numarası Arama sekmesinde');

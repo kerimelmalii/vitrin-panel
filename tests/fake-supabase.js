@@ -72,6 +72,7 @@
   const tableData = {
     calls: () => [{ called_at: now(), outcome: 'no_answer', note: 'meşguldü' }],
     scan_history: () => [{ scanned_at: now(), city: 'Ankara', district: 'Çankaya', sector: 'kuaför', places_found: 60, saved: 31 }],
+    v_queue: () => biz.filter(b => lstOf(b) === 'sent').map(b => ({ ...b, lst: 'sent', updated_at: now() })),
     rapor_haftalik: () => [{ hafta: '2026-10-12', islem: 10, wa_gonderilen: 7, donen: 3, ilgilenen: 2, satis: 1, red: 0, ulasilamadi: 2 }],
     rapor_bolge_sektor: () => [{ city: 'Ankara', sector: 'kuaför', islenen: 7, wa: 7, donen: 3, satis: 1 }],
     v_customers: () => customers.map(c => ({ ...c, last_note: lastNote(c) })),
