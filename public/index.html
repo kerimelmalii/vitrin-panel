@@ -418,6 +418,13 @@
 
     <!-- Geçmiş -->
     <section id="histView" class="hide">
+      <div class="card" id="repCard" style="margin-bottom:12px">
+        <div class="eyebrow" style="font-weight:700;font-size:13px;color:var(--mute);margin-bottom:6px">Bu hafta</div>
+        <div class="tiles" id="repTiles" style="margin-top:0"></div>
+        <p class="s" id="repLine" style="font-size:13.5px;color:var(--body);margin:10px 0 0"></p>
+        <details style="margin-top:10px"><summary style="cursor:pointer;font-size:13.5px;font-weight:700;color:var(--mute)">Haftalar ve sektörler</summary>
+          <ul class="list compact" id="repWeeks"></ul><ul class="list compact" id="repSectors"></ul></details>
+      </div>
       <input id="histSearch" type="search" placeholder="İşletme adı, not veya telefon ara…" aria-label="Geçmişte ara" style="margin-bottom:12px;background:var(--card);border-color:var(--line)">
       <div class="card" style="padding:8px 20px"><ul class="list" id="histList"></ul></div>
     </section>
@@ -708,8 +715,8 @@ $('emptyScan').onclick = ()=>tab('scan');
 $('emptyOther').onclick = ()=>{ const next = LISTS.find(l=>l!==list && counts[l]) || LISTS[(LISTS.indexOf(list)+1)%3]; tab(next); };
 
 // ---- WhatsApp (yarı elle) ----
-const DEFAULT_TPL = "Merhaba,\n\nÖncelikle umarım iyisinizdir ve her şey yolundadır.\n\nİşletmenizin Google Haritalar'daki yüksek puanını ve olumlu müşteri yorumlarını gördük; ancak işletmenize ait bir web sitesi bulunmadığını fark ettik.\n\nVitrinweb olarak yerel işletmelere, 5 iş günü içinde yayına alabilecekleri, mobil uyumlu ve profesyonel web siteleri hazırlıyoruz.\n\nÖdemelerinizi Türkiye'nin güvenilir ödeme altyapılarından iyzico üzerinden güvenle gerçekleştirebilirsiniz; kart bilgileriniz tarafımızca saklanmaz.\n\nSizi https://www.vitrinweb.com.tr adresini ziyaret etmeye davet ediyoruz. Paket içeriğini ve tüm detayları sitemizde ve ekteki broşürde inceleyebilirsiniz. Sorularınız için telefon numaramızdan, e-posta adresimizden veya sitemizdeki iletişim bölümünden bize ulaşabilirsiniz.\n\nSaygılarımızla,\nVitrinweb\n\nKurumsal Mailimiz: iletisim@vitrinweb.com.tr\nTelefon Numaramız: 0538 629 94 90\n\nBizden mesaj almak istemiyorsanız \"iptal\" yazmanız yeterli, bir daha yazmayacağız.";
-const TPL_KEY = 'vitrin_wa_tpl_v4';   // şablon değişince sürüm artar; eski kayıtlı metin devreye girmez
+const DEFAULT_TPL = "Merhaba,\n\nÖncelikle umarım iyisinizdir ve her şey yolundadır.\n\nİşletmenizin Google Haritalar'daki yüksek puanını ve olumlu müşteri yorumlarını gördük; ancak işletmenize ait bir web sitesi bulunmadığını fark ettik.\n\nVitrinweb olarak yerel işletmelere, 5 iş günü içinde yayına alabilecekleri, mobil uyumlu ve profesyonel web siteleri hazırlıyoruz.\n\nÖdemelerinizi Türkiye'nin güvenilir ödeme altyapılarından iyzico üzerinden güvenle gerçekleştirebilirsiniz; kart bilgileriniz tarafımızca saklanmaz.\n\nSizi sitemizi ziyaret etmeye davet ediyoruz:\n\nhttps://www.vitrinweb.com.tr\n\nPaket içeriğini ve tüm detayları sitemizde ve ekteki broşürde inceleyebilirsiniz. Sorularınız için telefon numaramızdan, e-posta adresimizden veya sitemizdeki iletişim bölümünden bize ulaşabilirsiniz.\n\nSaygılarımızla,\nVitrinweb\n\nKurumsal Mailimiz: iletisim@vitrinweb.com.tr\nTelefon Numaramız: 0538 629 94 90\n\nBizden mesaj almak istemiyorsanız \"iptal\" yazmanız yeterli, bir daha yazmayacağız.";
+const TPL_KEY = 'vitrin_wa_tpl_v5';   // şablon değişince sürüm artar; eski kayıtlı metin devreye girmez
 function getTpl(){ try{ return localStorage.getItem(TPL_KEY) || DEFAULT_TPL; }catch(e){ return DEFAULT_TPL; } }
 function setTpl(v){ try{ v ? localStorage.setItem(TPL_KEY,v) : localStorage.removeItem(TPL_KEY); }catch(e){} }
 function shortName(n){
@@ -864,7 +871,27 @@ document.querySelectorAll('#listSeg [data-tab]').forEach(b=>b.addEventListener('
 // ---- Geçmiş ----
 let hTimer; $('histSearch').oninput=()=>{ clearTimeout(hTimer); hTimer=setTimeout(loadHistory,300); };
 function emptyLi(ul, text){ const li=el('li'); li.style.display='block'; li.appendChild(el('span','s',text)); ul.appendChild(li); }
+const pct = (a,b) => b ? Math.round(a/b*100)+'%' : '–';
+async function loadReport(){
+  const [w, s] = await Promise.all([
+    sb.from('rapor_haftalik').select('*').order('hafta',{ascending:false}).limit(6),
+    sb.from('rapor_bolge_sektor').select('*').order('wa',{ascending:false}).limit(8)]);
+  if(w.error || s.error){ $('repCard').classList.add('hide'); return; }       // görünümler henüz kurulmadıysa sessizce gizle
+  $('repCard').classList.remove('hide');
+  const rows = w.data||[], cur = rows[0] || {};
+  const tiles=$('repTiles'); tiles.replaceChildren();
+  [['Gönderilen',cur.wa_gonderilen],['Dönen',cur.donen],['Satış',cur.satis]].forEach(([l,v])=>{
+    const t=el('div','tile'); t.append(el('b',null,String(v ?? 0)), el('small',null,l)); tiles.appendChild(t); });
+  $('repLine').textContent = rows.length
+    ? `İlgilenen ${cur.ilgilenen} · Reddeden ${cur.red} · Ulaşılamayan ${cur.ulasilamadi} · Dönüş oranı ${pct(cur.donen,cur.islem)} (${cur.donen}/${cur.islem} işlem)`
+    : 'Henüz işlem yok.';
+  const wl=$('repWeeks'); wl.replaceChildren();
+  rows.forEach(r=>{ const li=el('li'); li.append(el('div','t',fmtDay(r.hafta)+' haftası'), el('span','s',`${r.wa_gonderilen} gönderilen · ${r.donen} dönen · ${r.satis} satış`)); wl.appendChild(li); });
+  const sl=$('repSectors'); sl.replaceChildren();
+  (s.data||[]).forEach(r=>{ const li=el('li'); li.append(el('div','t',`${r.sector} · ${r.city}`), el('span','s',`${r.wa} gönderilen · ${r.donen} dönen (${pct(r.donen,r.islenen)}) · ${r.satis} satış`)); sl.appendChild(li); });
+}
 async function loadHistory(){
+  loadReport();
   const { data, error } = await sb.rpc('search_history',{ p_term:$('histSearch').value.trim(), p_limit:150 });
   const ul=$('histList'); ul.replaceChildren();
   if(error){ fail(error); return; }
