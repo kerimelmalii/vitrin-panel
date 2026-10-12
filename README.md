@@ -78,7 +78,7 @@ python3 scan.py --city Ankara --districts "Çankaya" --sectors "kuaför"
 
 * Filtre: puan ≥ 4.3, yorum 10–300, web sitesi yok ya da yalnızca sosyal medya/link sayfası, geçerli telefon, açık işletme.
 * Aynı bölge+sektör **90 gün** tekrar taranmaz (`--force` ile zorlanır). `closed_regions` tablosundaki bölgeler (Bursa) atlanır.
-* Aynı `place_id` ya da telefon ikinci kez eklenmez; "ilgilenmiyor/dur dedi" diyenler kayıtta kalır, bu yüzden tekrar taramada geri gelmez.
+* Aynı `place_id` ya da telefon ikinci kez eklenmez; "ilgilenmiyor/iptal dedi" diyenler kayıtta kalır, bu yüzden tekrar taramada geri gelmez.
 * Her sorgu en çok `--max-pages` (3) sayfa ≈ 60 sonuç = en çok 3 API çağrısıdır; `--max-queries` (30) toplam çağrıyı sınırlar. Fiyat için Google Maps Platform fiyat sayfasına bakın.
 * Her kayda 0–100 **skor** verilir (puan, yorum, sitesizlik, cep numarası); panel yüksek skoru önce gösterir.
 
@@ -90,7 +90,7 @@ vitrinweb. marka diliyle tasarlanmıştır (beyaz zemin, Manrope, lacivert vurgu
 
 
 * **Üst menü:** Liste (WhatsApp / Arama / Takip) · Müşteriler · Tara · Geçmiş · Ekip. Menüde yalnızca rolünüzün göreceği bölümler çıkar.
-* **WhatsApp:** yeni + cep numarası. "WhatsApp'tan yaz" hazır mesajla açar, ekip gözden geçirip kendi gönderir, sonra "WhatsApp gönderdim". 3 gün sonra **Takip**'e düşer.
+* **WhatsApp:** yeni + cep numarası. "WhatsApp'tan yaz" hazır mesajla açar, ekip gözden geçirip kendi gönderir; "Broşürü gönder" broşürü panoya kopyalar (bilgisayarda Cmd+V) ya da telefonda paylaşım menüsünü açar; sonra "WhatsApp gönderdim". 3 gün sonra **Takip**'e düşer.
   WhatsApp'ı olmayan ya da yazmak istemediğiniz kayıt için **"Arama listesine al"**.
 * **Arama:** sabit hatlar + arama listesine alınanlar + açmayanlar (günde bir tekrar, en fazla 3 deneme; sonra "ulaşılamaz").
 * **Takip:** zamanı gelen "sonra ara", WhatsApp'ı 3 gün önce gidenler, ilgilenenler.
@@ -98,7 +98,7 @@ vitrinweb. marka diliyle tasarlanmıştır (beyaz zemin, Manrope, lacivert vurgu
 * **Geçmiş:** tüm kayıtlar, ad/not/telefonla arama.
 * İki kişi aynı anda çalışabilir: sunucu bir kartı açana 15 dk "kilitler", diğeri başka kart görür.
 * Sayaçlar (hafta/bugün) Türkiye saatiyle ve ekip toplamıdır. Günlük 25 WhatsApp aşılırsa uyarır (engellemez).
-* "İlgilenmiyor" ve "Dur dedi" kalıcıdır, sunucu bir daha işlem yapılmasına izin vermez.
+* "İlgilenmiyor" ve "İptal dedi" kalıcıdır, sunucu bir daha işlem yapılmasına izin vermez.
 
 ## Güvenlik
 
@@ -121,4 +121,4 @@ PGHOST=... PGUSER=postgres tests/run_sql_tests.sh    # şema + iş kuralları, b
 
 ## Hukuki not
 Cep numaralarına ticari ileti göndermek KVKK ve İYS (6563 sayılı Kanun) kapsamına girebilir. Canlıya geçmeden bir hukukçuya danışın.
-Mesaj şablonundaki "dur yazmanız yeterli" cümlesi panelde silinemez; "dur" diyenleri "Dur dedi" olarak işaretlemeyi unutmayın.
+Mesaj şablonundaki "iptal yazmanız yeterli" cümlesi panelde silinemez; "iptal" yazanları "İptal dedi" olarak işaretlemeyi unutmayın.
