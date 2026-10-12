@@ -228,6 +228,7 @@ assert.equal((await last('set_user_role'))[1].p_role, 'none'); ok('yetki kaldır
 
 // =============================================================== GEÇMİŞ, ÇIKIŞ
 await page.click('[data-nav="hist"]'); await page.waitForSelector('#histList li');
+assert.match(await txt('#repTiles'), /7\s*Gönderilen/); assert.match(await txt('#repLine'), /Dönüş oranı 30%/); ok('rapor: haftalık sayılar ve dönüş oranı');
 assert.equal(await page.locator('#histList li').count(), 5); await shot('11-gecmis'); await axe('geçmiş'); ok('geçmiş listesi dolu');
 await page.fill('#histSearch', 'meşgul'); await page.waitForTimeout(500);
 assert.ok((await calls()).some(c => c[0] === 'search_history' && c[1].p_term === 'meşgul')); ok('geçmişte arama sunucuya gider');

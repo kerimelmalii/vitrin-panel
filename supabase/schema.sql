@@ -50,6 +50,8 @@ create unique index if not exists businesses_phone_uniq    on public.businesses 
 create index if not exists businesses_queue_idx  on public.businesses (status, next_action_at);
 create index if not exists businesses_filter_idx on public.businesses (city, sector);
 
+-- Eski migration'dan kalan otomatik adlı kısıtlamalar yenileriyle çakışmasın
+alter table public.businesses drop constraint if exists businesses_status_check;
 alter table public.businesses drop constraint if exists businesses_status_chk;
 alter table public.businesses add constraint businesses_status_chk check (status in
   ('new','wa_sent','no_answer','callback','interested','won','rejected','do_not_contact',
@@ -67,6 +69,7 @@ create table if not exists public.calls (
   called_at   timestamptz not null default now()
 );
 alter table public.calls add column if not exists user_id uuid;
+alter table public.calls drop constraint if exists calls_outcome_check;
 alter table public.calls drop constraint if exists calls_outcome_chk;
 alter table public.calls add constraint calls_outcome_chk check (outcome in
   ('wa_sent','no_answer','callback','interested','won','rejected','do_not_contact',
@@ -565,5 +568,39 @@ grant execute on function public.next_business(text,text,text,uuid[]), public.re
 -- Politikalar ve görünümler bu iki fonksiyonu çağırdığı için giriş yapmış kullanıcıda çalışabilmeli
 grant execute on function public.has_perm(text), public.role_perms(text) to authenticated;
 grant execute on function public.ingest_businesses(jsonb), public.user_can(uuid,text) to service_role;
+-- ---------- Raporlar (Türkiye saati; giriş yapan yetkili kullanıcı kendi yetkisiyle okur) ----------
+--  donen = bir cevap alınan işlem (ilgilendi, sonra ara, satış, ret); ulasilamadi = açmadı / yanlış numara / kapanmış
+drop view if exists public.rapor_gunluk, public.rapor_haftalik, public.rapor_bolge_sektor;
+create view public.rapor_gunluk with (security_invoker = true) as
+select (c.called_at at time zone 'Europe/Istanbul')::date as gun,
+       count(*) as islem,
+       count(*) filter (where c.outcome = 'wa_sent') as wa_gonderilen,
+       count(*) filter (where c.outcome in ('interested','callback','won','rejected','do_not_contact')) as donen,
+       count(*) filter (where c.outcome in ('interested','callback')) as ilgilenen,
+       count(*) filter (where c.outcome = 'won') as satis,
+       count(*) filter (where c.outcome in ('rejected','do_not_contact')) as red,
+       count(*) filter (where c.outcome in ('no_answer','wrong_number','closed_business')) as ulasilamadi
+  from public.calls c group by 1;
+create view public.rapor_haftalik with (security_invoker = true) as
+select date_trunc('week', c.called_at at time zone 'Europe/Istanbul')::date as hafta,
+       count(*) as islem,
+       count(*) filter (where c.outcome = 'wa_sent') as wa_gonderilen,
+       count(*) filter (where c.outcome in ('interested','callback','won','rejected','do_not_contact')) as donen,
+       count(*) filter (where c.outcome in ('interested','callback')) as ilgilenen,
+       count(*) filter (where c.outcome = 'won') as satis,
+       count(*) filter (where c.outcome in ('rejected','do_not_contact')) as red,
+       count(*) filter (where c.outcome in ('no_answer','wrong_number','closed_business')) as ulasilamadi
+  from public.calls c group by 1;
+create view public.rapor_bolge_sektor with (security_invoker = true) as
+select b.city, b.sector,
+       count(distinct b.id) as islenen,
+       count(distinct b.id) filter (where c.outcome = 'wa_sent') as wa,
+       count(distinct b.id) filter (where c.outcome in ('interested','callback','won','rejected','do_not_contact')) as donen,
+       count(distinct b.id) filter (where c.outcome = 'won') as satis
+  from public.calls c join public.businesses b on b.id = c.business_id
+ group by b.city, b.sector;
+revoke all on public.rapor_gunluk, public.rapor_haftalik, public.rapor_bolge_sektor from anon;
+grant select on public.rapor_gunluk, public.rapor_haftalik, public.rapor_bolge_sektor to authenticated;
+
 revoke all on public.v_queue, public.v_customers from anon;
 grant select on public.v_queue, public.v_customers to authenticated;
