@@ -50,7 +50,11 @@
   .wa .btn{flex:1;background:#1faa59;color:#fff;font-weight:600}
   .wa .btn:hover{background:#198f4a}
   .wa .btn[disabled]{background:#fff;color:var(--mute);cursor:default}
-  .wa .link{font-size:14px;white-space:nowrap}
+  .wa{flex-wrap:wrap}
+  .wa .link{font-size:14px;white-space:nowrap;flex-basis:100%;text-align:left}
+  .wa .btn.br{background:#fff;color:var(--ink);font-weight:500}
+  .wa .btn.br:hover{background:var(--fill-h)}
+  .wa .btn.br[disabled]{color:var(--mute)}
   #tplBox{margin-top:10px}
   #tplBox textarea{min-height:150px;margin:6px 0 0;font-size:14px}
   .wahint{font-size:13px;color:var(--mute);margin-top:6px}
@@ -122,12 +126,13 @@
         <div id="bHistory" class="meta" style="margin-top:8px"></div>
 
         <div class="wa">
-          <button class="btn" id="waBtn">WhatsApp'tan yaz</button>
+          <button class="btn" id="waBtn">1. WhatsApp'tan yaz</button>
+          <button class="btn br" id="brBtn">2. Broşürü gönder</button>
           <button class="link" id="tplToggle">Mesajı düzenle</button>
         </div>
         <div class="wahint" id="waHint"></div>
         <div id="tplBox" class="hide">
-          <label>Mesaj şablonu ({isim} işletme adıyla değişir; "dur" cümlesini silme)</label>
+          <label>Mesaj şablonu ({isim} yazarsan işletme adıyla değişir; "dur" cümlesini silme)</label>
           <textarea id="tplText"></textarea>
           <div class="row2"><button class="btn" id="tplReset">Varsayılana dön</button><button class="btn primary" id="tplSave">Kaydet</button></div>
         </div>
@@ -195,6 +200,7 @@ async function init(){
 function showLogin(){ $('login').classList.remove('hide'); $('app').classList.add('hide'); }
 async function showApp(){
   $('login').classList.add('hide'); $('app').classList.remove('hide');
+  loadBrochure();
   await loadFilters(); await refreshCounts(); await loadNext();
 }
 $('loginForm').addEventListener('submit', async e=>{
@@ -283,9 +289,10 @@ async function loadNext(){
 }
 
 // ---- WhatsApp (yarı elle) ----
-const DEFAULT_TPL = "Merhaba, {isim} için yazıyorum. Vitrin Web olarak küçük işletmelere hızlı ve uygun fiyatlı web sitesi hazırlıyoruz. Google Haritalar'daki yüksek puanınızı bir web sitesiyle güçlendirmek isteriz. İlgilenirseniz kısaca bilgi verebilirim.\n\nBu mesajı istemiyorsanız \"dur\" yazmanız yeterli, bir daha yazmayacağız.\nvitrinweb.com.tr";
-function getTpl(){ try{ return localStorage.getItem('vitrin_wa_tpl') || DEFAULT_TPL; }catch(e){ return DEFAULT_TPL; } }
-function setTpl(v){ try{ v ? localStorage.setItem('vitrin_wa_tpl',v) : localStorage.removeItem('vitrin_wa_tpl'); }catch(e){} }
+const DEFAULT_TPL = "Merhaba,\n\nÖncelikle umarım iyisinizdir ve her şey yolundadır.\n\nİşletmenizin Google Haritalar'daki yüksek puanını ve olumlu müşteri yorumlarını gördük; ancak işletmenize ait bir web sitesi bulunmadığını fark ettik.\n\nVitrinweb olarak yerel işletmelere, 5 iş günü içinde yayına alabilecekleri, mobil uyumlu ve profesyonel web siteleri hazırlıyoruz.\n\nÖdemelerinizi Türkiye'nin güvenilir ödeme altyapılarından iyzico üzerinden güvenle gerçekleştirebilirsiniz; kart bilgileriniz tarafımızca saklanmaz.\n\nSizi https://www.vitrinweb.com.tr adresini ziyaret etmeye davet ediyoruz. Paket içeriğini ve tüm detayları sitemizde ve ekteki broşürde inceleyebilirsiniz. Sorularınız için telefon numaramızdan, e-posta adresimizden veya sitemizdeki iletişim bölümünden bize ulaşabilirsiniz.\n\nSaygılarımızla,\nVitrinweb\n\nKurumsal Mailimiz: iletisim@vitrinweb.com.tr\nTelefon Numaramız: 0538 629 94 90\n\nBizden mesaj almak istemiyorsanız \"dur\" yazmanız yeterli, bir daha yazmayacağız. Vitrinweb";
+const TPL_KEY = 'vitrin_wa_tpl_v2';   // şablon değişince sürüm artar, eski kayıtlı metin devreye girmez
+function getTpl(){ try{ return localStorage.getItem(TPL_KEY) || DEFAULT_TPL; }catch(e){ return DEFAULT_TPL; } }
+function setTpl(v){ try{ v ? localStorage.setItem(TPL_KEY,v) : localStorage.removeItem(TPL_KEY); }catch(e){} }
 function shortName(n){
   let x = (n||'').split(/\s[\/|]\s|\s-\s|\s\|\s|\/|\|/)[0].trim();     // SEO ekleri at
   if(x.length>40){ x = x.slice(0,40).replace(/\s+\S*$/,''); }
@@ -305,13 +312,68 @@ function setupWa(b){
     hint.textContent='Bu numarada WhatsApp yok, arayarak ulaşabilirsin.'; }
   else if(b.status==='wa_sent'){ btn.disabled=true; btn.textContent='WhatsApp gönderildi';
     hint.textContent='WhatsApp mesajı gönderilmişti, yanıt gelmediyse ara.'; }
-  else { btn.disabled=false; btn.textContent="WhatsApp'tan yaz";
-    hint.textContent="WhatsApp mesajı hazır yazılmış açılır. Gözden geçir, kendin gönder, sonra \"WhatsApp gönderdim\" de. Numarada WhatsApp yoksa \"WhatsApp'ta yok\" de, arama listesine geçer."; }
+  else { btn.disabled=false; btn.textContent="1. WhatsApp'tan yaz";
+    hint.textContent = brFile
+      ? "1) WhatsApp'tan yaz: mesaj hazır açılır, gözden geçirip gönder. 2) Broşürü gönder: aynı sohbete yapıştır ya da paylaş. 3) \"WhatsApp gönderdim\" de. Numarada WhatsApp yoksa \"WhatsApp'ta yok\" de, arama listesine geçer."
+      : "WhatsApp mesajı hazır yazılmış açılır. Gözden geçir, kendin gönder, sonra \"WhatsApp gönderdim\" de. Numarada WhatsApp yoksa \"WhatsApp'ta yok\" de, arama listesine geçer."; }
+  $('brBtn').disabled = btn.disabled;
 }
 $('waBtn').onclick = ()=>{
   if(!current || !isMobile(current)) return;
   if(waTodayCount >= WA_DAILY_LIMIT) toast('Bugünkü önerilen WhatsApp sınırına ulaştın (' + WA_DAILY_LIMIT + '). Yarın devam etmek numaranı korur.');
   window.open(waLink(current), '_blank', 'noopener');
+};
+// ---- Broşür: sitedeki tanıtım broşürü (www.vitrinweb.com.tr/brosur) ----
+// Telefonda: paylaşım menüsü (WhatsApp seçilir). Bilgisayarda: görsel panoya kopyalanır (Cmd+V),
+// PDF ise indirilir (sohbete sürüklenir).
+// Önce sitedeki broşür denenir; site henüz güncellenmediyse panelin yanındaki brosur.png kullanılır.
+const BROCHURE_FILES = ['https://www.vitrinweb.com.tr/brosur.png', 'brosur.png'];
+let brFile = null, brPath = null, brPng = null;
+async function loadBrochure(){
+  for(const f of BROCHURE_FILES){
+    try{
+      const r = await fetch(f, {cache:'no-cache'});
+      if(!r.ok) continue;
+      const type = (r.headers.get('content-type')||'').split(';')[0].trim();
+      if(!/^(application\/pdf|image\/(png|jpeg))$/.test(type)) continue;
+      const blob = await r.blob();
+      brFile = new File([blob], 'Vitrinweb-brosur.' + (type==='application/pdf' ? 'pdf' : type==='image/png' ? 'png' : 'jpg'), {type});
+      brPath = f;
+      if(type.startsWith('image/')) brPng = type==='image/png' ? blob : await toPng(blob).catch(()=>null);
+      break;
+    }catch(e){}
+  }
+  if(current) setupWa(current);
+}
+async function toPng(blob){
+  const bmp = await createImageBitmap(blob);
+  const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height;
+  c.getContext('2d').drawImage(bmp, 0, 0);
+  return await new Promise((ok, no)=>c.toBlob(b=>b ? ok(b) : no(new Error('png')), 'image/png'));
+}
+function downloadBrochure(){
+  const url = URL.createObjectURL(brFile);
+  const a = document.createElement('a'); a.href = url; a.download = brFile.name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url), 10000);
+  toast("Broşür indirildi. İndirilenler klasöründen WhatsApp sohbetine sürükle.");
+}
+$('brBtn').onclick = async ()=>{
+  if($('brBtn').disabled) return;
+  if(!brFile){ toast('Broşür bulunamadı. Panel deposuna brosur.png yükleyin.'); return; }
+  const touch = window.matchMedia && matchMedia('(pointer:coarse)').matches;
+  if(touch && navigator.canShare && navigator.canShare({files:[brFile]})){
+    try{ await navigator.share({files:[brFile]}); }
+    catch(e){ if(e.name !== 'AbortError') downloadBrochure(); }
+    return;
+  }
+  if(brPng && navigator.clipboard && window.ClipboardItem){
+    try{
+      await navigator.clipboard.write([new ClipboardItem({'image/png': brPng})]);
+      toast('Broşür kopyalandı. WhatsApp sohbetine Cmd+V (Windows: Ctrl+V) ile yapıştır.');
+      return;
+    }catch(e){}
+  }
+  downloadBrochure();
 };
 $('tplToggle').onclick = ()=>{ $('tplText').value = getTpl(); $('tplBox').classList.toggle('hide'); };
 $('tplReset').onclick  = ()=>{ setTpl(null); $('tplText').value = DEFAULT_TPL; toast('Varsayılan mesaj yüklendi'); };
