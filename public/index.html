@@ -313,6 +313,7 @@
         <button data-tab="whatsapp" class="on">WhatsApp<span class="n" id="n_whatsapp"></span></button>
         <button data-tab="call">Arama<span class="n" id="n_call"></span></button>
         <button data-tab="followup">Takip<span class="n" id="n_followup"></span></button>
+        <button data-tab="sent">Gönderildi<span class="n" id="n_sent"></span></button>
       </div>
       <div class="filters">
         <select id="cityFilter" aria-label="Şehir filtresi"><option value="">Tüm şehirler</option></select>
@@ -603,8 +604,8 @@ async function loadAccess(){
   return true;
 }
 const NAV_PERM = {lists:'leads', customers:'customers', scan:'scan', hist:'leads', team:'team'};
-const NAV_OF = {whatsapp:'lists', call:'lists', followup:'lists', customers:'customers', scan:'scan', hist:'hist', team:'team'};
-const VIEW_OF = {whatsapp:'callView', call:'callView', followup:'callView', customers:'customersView', scan:'scanView', hist:'histView', team:'teamView'};
+const NAV_OF = {whatsapp:'lists', call:'lists', followup:'lists', sent:'lists', customers:'customers', scan:'scan', hist:'hist', team:'team'};
+const VIEW_OF = {whatsapp:'callView', call:'callView', followup:'callView', sent:'callView', customers:'customersView', scan:'scanView', hist:'histView', team:'teamView'};
 const navBtns = () => [...document.querySelectorAll('#tabs [data-nav]')];
 
 async function showApp(){
@@ -657,7 +658,7 @@ async function refreshCounts(){
   }
   if(ct.error) fail(ct.error); else {
     counts = Object.fromEntries((ct.data||[]).map(r=>[r.lst, Number(r.n)]));
-    LISTS.forEach(l=>{ $('n_'+l).textContent = counts[l] || ''; });
+    [...LISTS,'sent'].forEach(l=>{ $('n_'+l).textContent = counts[l] || ''; });
     const total = LISTS.reduce((a,l)=>a+(counts[l]||0),0);
     $('n_lists').textContent = total || '';
     document.title = (total ? `(${total}) ` : '') + 'Vitrin';
@@ -719,7 +720,11 @@ function shortName(n){
 function isMobile(b){ return /^\+905\d{9}$/.test(b.phone_normalized||''); }
 function waLink(b){
   const text = getTpl().replace(/\{isim\}/g, shortName(b.name));
-  return 'https://wa.me/' + b.phone_normalized.replace('+','') + '?text=' + encodeURIComponent(text);
+  // Bilgisayarda ara sayfa olmadan doğrudan WhatsApp Web; telefonda uygulamayı açan wa.me
+  const touch = window.matchMedia && matchMedia('(pointer:coarse)').matches;
+  const base = touch ? 'https://wa.me/' + b.phone_normalized.replace('+','') + '?'
+                     : 'https://web.whatsapp.com/send?phone=' + b.phone_normalized.replace('+','') + '&';
+  return base + 'text=' + encodeURIComponent(text);
 }
 function setupWa(b){
   const btn=$('waBtn'), hint=$('waHint'), mob=isMobile(b);
@@ -734,7 +739,7 @@ function setupWa(b){
 $('waBtn').onclick = ()=>{
   if(!current || !isMobile(current)) return;
   if(waTodayCount >= WA_DAILY_LIMIT) toast('Bugünkü önerilen WhatsApp sınırına ulaştın (' + WA_DAILY_LIMIT + '). Yarın devam etmek numaranı korur.');
-  window.open(waLink(current), '_blank', 'noopener');
+  window.open(waLink(current), 'vitrin_wa');   // hep aynı sekme: WhatsApp Web her seferinde yeni sekme açmaz
 };
 $('tplToggle').onclick = ()=>{ $('tplText').value = getTpl(); $('tplBox').classList.toggle('hide'); };
 $('tplReset').onclick  = ()=>{ setTpl(null); $('tplText').value = DEFAULT_TPL; toast('Varsayılan mesaj yüklendi'); };
