@@ -97,7 +97,7 @@ vitrinweb. marka diliyle tasarlanmıştır (beyaz zemin, Manrope, lacivert vurgu
 * **Tara:** şehir/ilçe/sektör girip yeni işletme bulur (aşağıda "Panelden tarama").
 * **Geçmiş:** tüm kayıtlar, ad/not/telefonla arama.
 * İki kişi aynı anda çalışabilir: sunucu bir kartı açana 15 dk "kilitler", diğeri başka kart görür.
-* Sayaçlar (hafta/bugün) Türkiye saatiyle ve ekip toplamıdır. Günlük 25 WhatsApp aşılırsa uyarır (engellemez).
+* Sayaçlar (hafta/bugün) Türkiye saatiyle ve ekip toplamıdır. Günlük 20 WhatsApp aşılırsa uyarır (engellemez).
 * "İlgilenmiyor" ve "İptal dedi" kalıcıdır, sunucu bir daha işlem yapılmasına izin vermez.
 
 ## Güvenlik
