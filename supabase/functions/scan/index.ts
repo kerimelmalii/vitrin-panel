@@ -1,13 +1,14 @@
-// Vitrin Web – panelden tarama (Supabase Edge Function, tek dosya, dış bağımlılık yok).
+// Vitrin – panelden tarama (Supabase Edge Function, tek dosya, dış bağımlılık yok).
 //
 // Panel giriş yapmış kullanıcının kimliğiyle bu fonksiyonu çağırır; fonksiyon Google Places'ı sorgular,
-// filtreler ve Supabase'e yazar. Google anahtarı yalnızca burada (Supabase gizli anahtarı) durur.
+// (isteğe bağlı) filtreler ve kullanıcının çalışma alanına yazar. Google anahtarı yalnızca burada durur.
+// Her alanın aylık işletme kotası (workspaces.lead_quota) ve günlük Google çağrı sınırı ayrı sayılır.
 //
 // Gerekli gizli anahtar : GOOGLE_API_KEY
 // Opsiyonel             : MAX_CALLS_PER_DAY (varsayılan 60), ALLOWED_ORIGINS (virgülle; varsayılan panel adresi),
 //                         SCAN_SERVICE_KEY (platform service_role anahtarını sağlamıyorsa)
 // Otomatik gelenler     : SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
-// Mantık scan.py ile aynıdır; ortak test verisi: tests/scan_cases.json.
+// Ortak test verisi: tests/scan_cases.json.
 
 declare const Deno: any;
 
@@ -16,11 +17,8 @@ const PLACES_URL = "https://places.googleapis.com/v1/places:searchText";
 const FIELD_MASK = [
   "places.id", "places.displayName", "places.formattedAddress", "places.nationalPhoneNumber",
   "places.internationalPhoneNumber", "places.rating", "places.userRatingCount", "places.websiteUri",
-  "places.googleMapsUri", "places.businessStatus", "nextPageToken",
+  "places.googleMapsUri", "places.businessStatus", "places.regularOpeningHours", "nextPageToken",
 ].join(",");
-export const MIN_RATING = 4.3;
-export const MIN_REVIEWS = 10;
-export const MAX_REVIEWS = 300;
 export const RESCAN_DAYS = 90;
 const PAGE_SIZE = 20;
 const MAX_PAGES = 3;
@@ -78,28 +76,51 @@ export function classifyWebsite(uri: string | null | undefined): "none" | "socia
   return SOCIAL_HOSTS.some((h) => host === h || host.endsWith("." + h)) ? "social_only" : "has_site";
 }
 
-export function leadScore(rating: number, reviews: number, website: string, mobile: boolean): number {
-  let s = Math.max(0, Math.min(1, (rating - MIN_RATING) / (5.0 - MIN_RATING))) * 30;
-  s += Math.min(reviews, 150) / 150 * 30;
-  s += website === "none" ? 25 : 15;
-  s += mobile ? 15 : 0;
+/** 0–100 öncelik: puan (40), yorum sayısı (40), cep telefonu (20). Puanı/yorumu olmayan da listeye girer, sona düşer. */
+export function leadScore(rating: number | null, reviews: number | null, mobile: boolean): number {
+  let s = rating == null ? 0 : Math.max(0, Math.min(1, (rating - 3.5) / 1.5)) * 40;
+  s += Math.min(reviews ?? 0, 200) / 200 * 40;
+  s += mobile ? 20 : 0;
   return Math.floor(s + 0.5);
+}
+
+/** Kullanıcının taramada isteğe bağlı seçtiği filtreler. Hiçbiri seçilmezse yalnızca açık işletmeler alınır. */
+export interface Filters { min_rating?: number; min_reviews?: number; max_reviews?: number; open_days?: number[] }
+export const DAY_TR = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"];
+
+/** Haftanın hangi günleri açık? (Google: 0 = Pazar). Bilgi yoksa null. */
+export function openDays(place: any): Set<number> | null {
+  const periods = place.regularOpeningHours?.periods;
+  if (!Array.isArray(periods) || !periods.length) return null;
+  const days = new Set<number>();
+  for (const p of periods) {
+    if (p?.open?.day == null) continue;
+    if (!p.close) { for (let d = 0; d < 7; d++) days.add(d); continue; }   // 7/24 açık
+    days.add(Number(p.open.day));
+  }
+  return days;
 }
 
 export interface Row {
   place_id: string; name: string; address: string; city: string; district: string | null; sector: string;
-  phone_raw: string | null; phone_normalized: string; rating: number; review_count: number;
+  phone_raw: string | null; phone_normalized: string; rating: number | null; review_count: number | null;
   website_status: string; maps_url: string | null; lead_score: number;
 }
 
-export function placeToRow(place: any, city: string, district: string, sector: string): { row?: Row; why?: string } {
+export function placeToRow(place: any, city: string, district: string, sector: string, filters: Filters = {}): { row?: Row; why?: string } {
+  // Her zaman: geçici ya da kalıcı kapalı işletmeler alınmaz
   if (place.businessStatus != null && place.businessStatus !== "OPERATIONAL") return { why: "kapalı" };
-  const rating = place.rating, reviews = place.userRatingCount;
-  if (rating == null || reviews == null) return { why: "puan yok" };
-  if (rating < MIN_RATING) return { why: "puan düşük" };
-  if (reviews < MIN_REVIEWS || reviews > MAX_REVIEWS) return { why: "yorum aralık dışı" };
-  const website = classifyWebsite(place.websiteUri);
-  if (website === "has_site") return { why: "sitesi var" };
+  const rating: number | null = place.rating ?? null, reviews: number | null = place.userRatingCount ?? null;
+  // İsteğe bağlı filtreler
+  if (filters.min_rating != null && (rating == null || rating < filters.min_rating)) return { why: "puan düşük" };
+  if (filters.min_reviews != null && (reviews ?? 0) < filters.min_reviews) return { why: "yorum az" };
+  if (filters.max_reviews != null && (reviews ?? 0) > filters.max_reviews) return { why: "yorum fazla" };
+  if (filters.open_days?.length) {
+    const days = openDays(place);
+    if (!days) return { why: "çalışma saati yok" };
+    if (filters.open_days.some((d) => !days.has(d))) return { why: "istenen günde kapalı" };
+  }
+  // Ulaşılamayacak ya da yanlış bölgedeki kayıtlar işe yaramaz
   const rawPhone = place.nationalPhoneNumber || place.internationalPhoneNumber || null;
   const phone = normalizePhone(rawPhone);
   if (!phone) return { why: "telefon yok/geçersiz" };
@@ -111,8 +132,8 @@ export function placeToRow(place: any, city: string, district: string, sector: s
   return {
     row: {
       place_id: place.id, name, address: addr, city, district: district || null, sector, phone_raw: rawPhone,
-      phone_normalized: phone, rating, review_count: reviews, website_status: website,
-      maps_url: place.googleMapsUri ?? null, lead_score: leadScore(rating, reviews, website, isMobile(phone)),
+      phone_normalized: phone, rating, review_count: reviews, website_status: classifyWebsite(place.websiteUri),
+      maps_url: place.googleMapsUri ?? null, lead_score: leadScore(rating, reviews, isMobile(phone)),
     },
   };
 }
@@ -158,6 +179,35 @@ export function cleanName(raw: unknown, what: string): string {
     throw new UserError("bad_" + what, `${what === "district" ? "İlçe" : "Sektör"} geçersiz: "${v.slice(0, 30)}"`);
   }
   return v;
+}
+
+/** Filtreleri doğrular; boş bırakılanlar uygulanmaz. */
+export function cleanFilters(raw: unknown): Filters {
+  const f: Filters = {};
+  if (raw == null || typeof raw !== "object" || Array.isArray(raw)) return f;
+  const r = raw as Record<string, unknown>;
+  const num = (k: string, min: number, max: number): number | undefined => {
+    const v = r[k];
+    if (v == null || v === "") return undefined;
+    const n = Number(v);
+    if (!Number.isFinite(n) || n < min || n > max) throw new UserError("bad_filter", "Filtre değeri geçersiz: " + k);
+    return n;
+  };
+  const mr = num("min_rating", 1, 5), mn = num("min_reviews", 0, 1_000_000), mx = num("max_reviews", 0, 1_000_000);
+  if (mr != null) f.min_rating = mr;
+  if (mn != null) f.min_reviews = Math.floor(mn);
+  if (mx != null) f.max_reviews = Math.floor(mx);
+  if (f.min_reviews != null && f.max_reviews != null && f.min_reviews > f.max_reviews) {
+    throw new UserError("bad_filter", "En az yorum sayısı en fazladan büyük olamaz.");
+  }
+  if (r.open_days != null) {
+    if (!Array.isArray(r.open_days) || r.open_days.some((d) => !Number.isInteger(d) || (d as number) < 0 || (d as number) > 6)) {
+      throw new UserError("bad_filter", "Çalışma günleri geçersiz.");
+    }
+    const days = [...new Set(r.open_days as number[])].sort();
+    if (days.length) f.open_days = days;
+  }
+  return f;
 }
 
 export function cleanList(raw: unknown, max: number, what: string, canon: (s: string) => string): string[] {
@@ -247,10 +297,24 @@ async function authenticate(req: Request, env: Env, f: Fetch): Promise<string> {
   return u.id;
 }
 
-async function usageToday(db: Db, now: number): Promise<number> {
-  const rows = await db.get(`/scan_history?select=api_calls&scanned_at=gte.${encodeURIComponent(istanbulDayStart(now))}`);
+interface Ctx { workspace_id: string; lead_quota: number | null; leads_this_month: number }
+
+async function usageToday(db: Db, ctx: Ctx, now: number): Promise<number> {
+  const rows = await db.get(`/scan_history?select=api_calls&workspace_id=eq.${ctx.workspace_id}&scanned_at=gte.${encodeURIComponent(istanbulDayStart(now))}`);
   return rows.reduce((n, r) => n + (Number(r.api_calls) || 0), 0);
 }
+
+function lookups(db: Db, ctx: Ctx, now: number) {
+  const ws = `workspace_id=eq.${ctx.workspace_id}`;
+  return Promise.all([
+    db.get(`/closed_regions?select=city,district&${ws}`),
+    db.get(`/scan_history?select=city,district,sector,scanned_at&${ws}&scanned_at=gte.${encodeURIComponent(new Date(now - RESCAN_DAYS * 86400_000).toISOString())}`),
+    usageToday(db, ctx, now),
+  ]);
+}
+
+const quotaLeft = (ctx: Ctx) => ctx.lead_quota == null ? null : Math.max(0, ctx.lead_quota - ctx.leads_this_month);
+const quotaInfo = (ctx: Ctx) => ({ limit: ctx.lead_quota, used: ctx.leads_this_month, left: quotaLeft(ctx) });
 
 async function searchText(env: Env, f: Fetch, query: string, token?: string, sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))): Promise<any> {
   const body: any = { textQuery: query, languageCode: "tr", regionCode: "TR", pageSize: PAGE_SIZE };
@@ -274,17 +338,14 @@ async function searchText(env: Env, f: Fetch, query: string, token?: string, sle
 }
 
 // ------------------------------------------------------------------ işlemler
-async function plan(db: Db, env: Env, body: any, now: number) {
+async function plan(db: Db, env: Env, ctx: Ctx, body: any, now: number) {
   const city = cleanCity(body.city);
   const districts = cleanList(body.districts, 30, "district", trTitle);
   const sectors = cleanList(body.sectors, 10, "sector", trLower);
   if (!sectors.length) throw new UserError("no_sector", "En az bir sektör girin.");
+  cleanFilters(body.filters);
   const ds = districts.length ? districts : [""];
-  const [closed, history, used] = await Promise.all([
-    db.get("/closed_regions?select=city,district"),
-    db.get(`/scan_history?select=city,district,sector,scanned_at&scanned_at=gte.${encodeURIComponent(new Date(now - RESCAN_DAYS * 86400_000).toISOString())}`),
-    usageToday(db, now),
-  ]);
+  const [closed, history, used] = await lookups(db, ctx, now);
   const units = [];
   for (const district of ds) for (const sector of sectors) {
     const recent = recentScan(history, city, district, sector, now);
@@ -295,22 +356,26 @@ async function plan(db: Db, env: Env, body: any, now: number) {
     });
   }
   const todo = units.filter((u) => u.status === "scan").length;
-  return { city, units, usage: { used, limit: env.MAX_CALLS_PER_DAY }, est_calls: todo * MAX_PAGES, fits_today: Math.max(0, Math.floor((env.MAX_CALLS_PER_DAY - used) / MAX_PAGES)) };
+  return {
+    city, units, usage: { used, limit: env.MAX_CALLS_PER_DAY }, quota: quotaInfo(ctx),
+    est_calls: todo * MAX_PAGES, fits_today: Math.max(0, Math.floor((env.MAX_CALLS_PER_DAY - used) / MAX_PAGES)),
+  };
 }
 
-async function run(db: Db, env: Env, f: Fetch, body: any, now: number) {
+async function run(db: Db, env: Env, ctx: Ctx, f: Fetch, body: any, now: number) {
   const city = cleanCity(body.city);
   const district = body.district ? trTitle(cleanName(body.district, "district")) : "";
   const sector = trLower(cleanName(body.sector, "sector"));
   const force = body.force === true;
+  const filters = cleanFilters(body.filters);
 
-  const [closed, history, used] = await Promise.all([
-    db.get("/closed_regions?select=city,district"),
-    db.get(`/scan_history?select=city,district,sector,scanned_at&scanned_at=gte.${encodeURIComponent(new Date(now - RESCAN_DAYS * 86400_000).toISOString())}`),
-    usageToday(db, now),
-  ]);
+  const [closed, history, used] = await lookups(db, ctx, now);
   if (regionClosed(closed, city, district)) return { skipped: "closed", message: "Kapalı bölge, taranmadı." };
   if (!force && recentScan(history, city, district, sector, now)) return { skipped: "recent", message: `${RESCAN_DAYS} gün içinde taranmış.` };
+  const qLeft = quotaLeft(ctx);
+  if (qLeft === 0) {
+    throw new UserError("quota", `Bu ayki işletme kotası doldu (${ctx.lead_quota}). Yeni ay başında devam edebilir ya da paketinizi büyütebilirsiniz.`, 429);
+  }
   const left = env.MAX_CALLS_PER_DAY - used;
   if (left <= 0) throw new UserError("daily_limit", `Günlük Google çağrı sınırına ulaşıldı (${env.MAX_CALLS_PER_DAY}). Yarın devam edin.`, 429);
   if (!env.GOOGLE_API_KEY) throw new UserError("not_configured", "GOOGLE_API_KEY gizli anahtarı Supabase'de tanımlı değil.", 500);
@@ -326,16 +391,24 @@ async function run(db: Db, env: Env, f: Fetch, body: any, now: number) {
     const places: any[] = resp.places ?? [];
     found += places.length;
     for (const p of places) {
-      const { row, why } = placeToRow(p, city, district, sector);
+      const { row, why } = placeToRow(p, city, district, sector, filters);
       if (row && !seen.has(row.place_id)) { seen.add(row.place_id); rows.push(row); }
       else if (why) reasons[why] = (reasons[why] ?? 0) + 1;
     }
     token = resp.nextPageToken;
     if (!token || places.length < PAGE_SIZE) break;
   }
-  const saved = rows.length ? Number(await db.rpc("ingest_businesses", { p_rows: rows })) || 0 : 0;
-  await db.insert("scan_history", { city, district, sector, places_found: found, saved, api_calls: calls });
-  return { city, district, sector, found, matched: rows.length, saved, calls, reasons, warning, used: used + calls, limit: env.MAX_CALLS_PER_DAY };
+  // Kota dolmak üzereyse en yüksek skorlu olanlar alınır
+  let toSave = rows, capped = 0;
+  if (qLeft != null && rows.length > qLeft) {
+    toSave = [...rows].sort((a, b) => b.lead_score - a.lead_score).slice(0, qLeft);
+    capped = rows.length - qLeft;
+  }
+  const saved = toSave.length ? Number(await db.rpc("ingest_businesses", { p_workspace: ctx.workspace_id, p_rows: toSave })) || 0 : 0;
+  await db.insert("scan_history", { workspace_id: ctx.workspace_id, city, district, sector, places_found: found, saved, api_calls: calls });
+  if (capped) warning = [warning, `Aylık kota nedeniyle ${capped} işletme kaydedilmedi.`].filter(Boolean).join(" ");
+  const quota = quotaInfo({ ...ctx, leads_this_month: ctx.leads_this_month + saved });
+  return { city, district, sector, found, matched: rows.length, saved, calls, reasons, warning, used: used + calls, limit: env.MAX_CALLS_PER_DAY, quota };
 }
 
 export async function handle(req: Request, env: Env, f: Fetch = fetch, now = Date.now()): Promise<Response> {
@@ -345,14 +418,17 @@ export async function handle(req: Request, env: Env, f: Fetch = fetch, now = Dat
     if (!env.SUPABASE_URL || !env.SERVICE_KEY) throw new UserError("not_configured", "Sunucu ayarı eksik.", 500);
     const userId = await authenticate(req, env, f);
     const db = new Db(env, f);
-    // Rol/izin kuralları veritabanında tek yerde tutulur (user_can); tarama için "scan" izni gerekir
-    if ((await db.rpc("user_can", { p_user: userId, p_perm: "scan" })) !== true) {
+    // Alan, rol/izin ve kota veritabanında tek yerde tutulur (scan_context); tarama için "scan" izni gerekir
+    const c = await db.rpc("scan_context", { p_user: userId });
+    if (!c || c.can_scan !== true || !c.workspace_id) {
       throw new UserError("forbidden", "Bu işlem için yetkiniz yok. Yöneticinizden tarama yetkisi isteyin.", 403);
     }
+    const ctx: Ctx = { workspace_id: String(c.workspace_id), lead_quota: c.lead_quota == null ? null : Number(c.lead_quota), leads_this_month: Number(c.leads_this_month) || 0 };
+    if (!/^[0-9a-f-]{36}$/i.test(ctx.workspace_id)) throw new UserError("forbidden", "Alan bilgisi geçersiz.", 403);
     let body: any;
     try { body = await req.json(); } catch { throw new UserError("bad_json", "Geçersiz istek."); }
-    if (body?.action === "plan") return json(req, env, 200, await plan(db, env, body, now));
-    if (body?.action === "run") return json(req, env, 200, await run(db, env, f, body, now));
+    if (body?.action === "plan") return json(req, env, 200, await plan(db, env, ctx, body, now));
+    if (body?.action === "run") return json(req, env, 200, await run(db, env, ctx, f, body, now));
     throw new UserError("bad_action", "Geçersiz işlem.");
   } catch (e) {
     if (e instanceof UserError) return json(req, env, e.status, { error: e.code, message: e.message });

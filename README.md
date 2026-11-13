@@ -1,124 +1,113 @@
-# Vitrin Web – müşteri bulma, satış ve proje takip paneli
+# Vitrin – müşteri bulma ve satış paneli
 
-Google Haritalar'da puanı yüksek ama web sitesi olmayan işletmeleri bölge bölge bulur; ekip WhatsApp'tan yazar / arar,
-sonuçlar kaydedilir, aranan işletme bir daha çıkmaz. Hedef: haftada ~100 temas, günde en fazla ~20 WhatsApp.
+Google Haritalar'dan bölge ve sektöre göre işletme bulur; ekip WhatsApp'tan yazar ya da arar, sonucu işaretler.
+İlgilenenler müşteri panosuna düşer, satışlar ürün/adet/tutar olarak kaydedilir, ay sonunda rapor alınır.
+Birden fazla şirket (çalışma alanı) aynı paneli kullanır; her şirket yalnızca kendi verisini görür.
 
 | Parça | Dosya | Nerede çalışır |
 |---|---|---|
-| Veritabanı, roller, müşteri hattı | `supabase/schema.sql` | Supabase |
-| Tarama (panelden) | `supabase/functions/scan/index.ts` | Supabase Edge Function |
-| Tarama (terminalden, isteğe bağlı) | `scan.py` | Sadece sizin Mac'iniz |
+| Veritabanı, alanlar, roller, iş kuralları | `supabase/schema.sql` | Supabase |
+| Tarama | `supabase/functions/scan/index.ts` | Supabase Edge Function |
 | Panel | `public/index.html` | Vercel (`panel.vitrinweb.com.tr`) |
+| Aydınlatma metni (taslak) | `docs/AYDINLATMA_METNI.md` | Panelde Ekip > Notlar |
 
-## Kurulum (bir kez, bu sırayla)
+## Bu sürüme geçiş (pilot öncesi, bir kez, bu sırayla)
 
-1. **Veritabanı:** Supabase > SQL Editor'e `supabase/schema.sql` içeriğini yapıştırıp Run. Güvenle tekrar çalıştırılabilir; mevcut verinin üstüne ekler.
-   Authentication > Sign In / Providers'ta **"Allow new users to sign up" kapalı** olmalı; kullanıcıları Authentication > Users'tan siz ekleyin.
-2. **Deneme verisini silin** (gerçek taramadan önce): `supabase/reset_test_data.sql`.
-3. **Panel:** `public/index.html` içindeki `SUPABASE_URL` ve `SUPABASE_ANON_KEY` (publishable) değerlerinin **şema çalıştırdığınız projeyle aynı** olduğunu kontrol edin.
-   Vercel: Framework Preset = *Other*, Build Command boş. Çıktı klasörü `vercel.json` ile `public/` olarak ayarlı.
-   Domain: Vercel > Settings > Domains'e `panel.vitrinweb.com.tr`, DNS'te CNAME.
-4. **Panelden tarama (önerilen, bir kez kurulur):** aşağıdaki "Panelden tarama" bölümünü yapın.
-   Google anahtarını Places API ile kısıtlayın ve Google Cloud > Faturalama > **Bütçeler ve uyarılar** bölümünden bütçe uyarısı kurun.
-5. *(İsteğe bağlı)* Terminalden taramak için `.env.example` dosyasını `.env` olarak kopyalayıp doldurun (yalnızca kendi Mac'inizde).
-
-## Mevcut kurulumu güncelleme (müşteri hattı + roller sürümü)
-
-Sırayla, kesinti olmadan:
-1. **Supabase > SQL Editor:** `supabase/schema.sql` dosyasının güncel halini çalıştırın. Mevcut veriyi silmez. Mevcut kullanıcılara rol atar: **en eski kullanıcı Yönetici, diğerleri Satış**. Durumu "won" olan eski kayıtlar müşteri olarak eklenir. Eski panel şema güncellenince de çalışmaya devam eder.
-2. **Edge Functions > scan:** `supabase/functions/scan/index.ts` dosyasının yeni halini yapıştırıp yeniden Deploy edin (tarama artık "tarama" iznini de kontrol eder).
-3. Dalı/PR'ı birleştirin; Vercel yeni paneli yayınlar.
-4. Panele girin, **Ekip** sekmesinden arkadaşınıza ve diğer kişilere rol verin.
+1. **Supabase > SQL Editor:** `supabase/schema.sql` dosyasının tamamını yapıştırıp Run. Mevcut veriyi silmez:
+   bütün kayıtlar ve kullanıcılar **Vitrin** alanına bağlanır, eski müşteri aşamaları yenilerine çevrilir
+   (tasarım/yayında → Satış tamamlandı, beklemede → Anlaşma aşamasında, iptal → İletişimde), eski "tutar" alanı satış kalemine taşınır.
+2. **Supabase > Edge Functions > scan:** `supabase/functions/scan/index.ts` dosyasının yeni halini yapıştırıp Deploy.
+3. Dalı birleştirin; Vercel yeni paneli yayınlar.
+4. **Pilot şirketi açın:** panelde **Ekip > Alanlar** bölümünde şirket adını yazın, "Demo sürüm" işaretli ve kota 500 olarak **Alanı oluştur**.
+5. **Pilot kullanıcıları:** Supabase > Authentication > Users > Add user ile ekleyin. Kişi bir kez giriş yaptıktan sonra
+   **Ekip** listesinde görünür; alanını (pilot şirket) ve rolünü seçip Kaydet. Pilot şirketin en az bir **Yönetici**si olsun:
+   o kişi kendi ekibinin rollerini, mesaj şablonunu ve sektör önerilerini kendisi yönetir.
+6. *(İsteğe bağlı)* Supabase > Database > Extensions'ta **pg_cron**'u açıp `schema.sql`'i bir kez daha çalıştırın:
+   30 gün kuralı her gece otomatik işler. Açmasanız da olur: kural her taramada ayrıca çalışır ve eski kayıtlar listede zaten görünmez.
 
 Panel "Veritabanı güncellemesi gerekli" derse 1. adım yapılmamıştır.
 
-## Müşteriler (satış sonrası takip)
+## Çalışma alanları (şirketler)
 
-Listede **Satış oldu** dediğiniz işletme otomatik olarak **Müşteriler** sekmesine düşer (görüşme notunuz ilk not olur). Listeden gelmeyen müşteriyi **+ Ekle** ile elle girebilirsiniz.
+* Her şirket bir **alandır**. Vitrin **platform** alanıdır: yöneticileri yeni alan açar, kullanıcıları alanlara atar, kota ve demo durumunu değiştirir.
+* Bir kullanıcı tek bir alana aittir. İşletmeler, aramalar, müşteriler, satışlar, tarama geçmişi ve raporlar **alana özeldir**;
+  bu kural veritabanında (satır düzeyinde güvenlik ve fonksiyon kontrolleri) zorunludur, arayüzde gizlemeye dayanmaz.
+* Aynı işletme iki farklı alanda ayrı ayrı bulunabilir; bir alanın taraması diğerini etkilemez.
+* **Demo** alanda üstte "Demo sürüm" şeridi, paketler ve geri bildirim bağlantısı görünür; paket içerikleri kilitlidir.
+* **Aylık kota:** alanın bir ayda taramayla kaydedebileceği en çok işletme sayısı (pilot: 500). Kota dolunca tarama durur,
+  ay başında yenilenir. Kotanın son kısmında en yüksek öncelikli işletmeler alınır.
 
-* **Aşamalar:** Satış gerçekleşti → Bilgi toplanıyor → Site tasarlanıyor → Müşteri onayında → Yayında. Ayrıca Beklemede ve İptal. Aşama değişince isteğe bağlı not yazılır; kim, ne zaman değiştirdi kayda geçer.
-* **Her müşteride:** tutar (TL), alan adı, sıradaki adım ve tarihi (geçen adım kırmızı görünür), sınırsız not ve tam geçmiş (zaman çizelgesi), arama/WhatsApp düğmeleri.
-* **Pano:** aşama sayaçlarına tıklayarak filtreleyin, ad/telefon/alan adı ile arayın; üstte müşteri sayısı, üretimdekiler ve toplam tutar görünür.
+## Roller
 
-## Roller ve yetkiler
-
-Kullanıcıyı **Supabase > Authentication > Users > Add user** ile siz eklersiniz (kayıt kapalıdır). Rolü **Ekip** sekmesinden (yalnızca Yönetici) verirsiniz. **Rolü olmayan kimse hiçbir veri göremez.**
+Kullanıcıyı **Supabase > Authentication > Users > Add user** ile siz eklersiniz (kayıt kapalıdır). **Rolü olmayan kimse hiçbir veri göremez.**
 
 | Rol | Görür / yapar |
 |---|---|
-| **Yönetici** | Her şey: listeler, tarama, müşteriler, ekip ve roller, (ileride) abonelikler |
-| **Satış** | Listeler, geçmiş, tarama, müşteriler. Ekip ve abonelikleri görmez |
-| **Tasarımcı** | Yalnızca müşteriler (aşama, not, tutar, alan adı). Satış listelerini ve taramayı göremez |
+| **Yönetici** | Her şey: listeler, tarama, müşteriler, raporlar, ekip ve alan ayarları |
+| **Satış** | Listeler, tarama, müşteriler, raporlar. Ekip ve ayarları görmez |
+| **Operasyon** | Yalnızca müşteriler (aşama, satış, not). Listeleri ve taramayı göremez |
 
-Yetkiler arayüzde gizlenmekle kalmaz, veritabanında da zorunludur (satır düzeyinde güvenlik + fonksiyon kontrolleri). Son yöneticiyi kaldırmak/düşürmek engellenir.
-Yeni bir modül (örn. araç abonelikleri: Claude, GitHub…) eklemek için `role_perms` fonksiyonuna izin eklemek yeterlidir; `subscriptions` izni şimdiden yalnızca Yönetici'de tanımlıdır.
-
-## Panelden tarama (Tara sekmesi)
-
-Terminal gerekmez. Panelde **Tara** sekmesinde şehir, ilçe ve sektör yazılır; **Planı göster** hangi bölgelerin taranacağını (taranmış/kapalı olanlar atlanır) ve en çok kaç Google çağrısı yapılacağını gösterir; **Taramayı başlat** bölgeleri sırayla tarar, **Durdur** ile yarıda kesilebilir. Sonuçlar anında WhatsApp / Arama listelerine düşer.
-
-Google anahtarı panelde değil, Supabase'de gizli kalır. Kurulum (bir kez):
-1. Supabase > **Edge Functions** > **Deploy a new function** > **Via Editor**. Ad: `scan`. Editördeki her şeyi silip `supabase/functions/scan/index.ts` dosyasının tamamını yapıştırın, **Deploy**.
-2. Fonksiyonun **Settings** bölümünde **Verify JWT** (legacy secret) seçeneğini **kapatın**. Giriş kontrolünü fonksiyonun kendisi yapar ve kayıtlı kullanıcı dışındakini reddeder.
-3. Supabase > Edge Functions > **Secrets** > **Add new secret**: Ad `GOOGLE_API_KEY`, değer Google'daki Places anahtarınız.
-4. Panelde **Tara** sekmesini deneyin. "Tarama servisi kurulu değil" yazarsa 1. adım eksiktir.
-
-* **Günlük sınır:** Bir günde (Türkiye saatiyle) en çok **60** Google çağrısı yapılır (≈20 bölge). Değiştirmek için `MAX_CALLS_PER_DAY` adlı secret ekleyin. Sınır aşılırsa panel yarın devam etmenizi söyler.
-* **Başka alan adı:** Paneli `panel.vitrinweb.com.tr` dışında bir adresten açacaksanız `ALLOWED_ORIGINS` secret'ına o adresi (virgülle) ekleyin.
-* **Fonksiyonu güncellemek:** Dosya değişince aynı editörde yeni içeriği yapıştırıp yeniden Deploy edin.
-
-## Tarama (terminalden, isteğe bağlı)
-
-```bash
-# önce deneme: Google'a sorar ama hiçbir şey yazmaz
-python3 scan.py --city Ankara --districts "Çankaya,Keçiören" --sectors "kuaför,diş hekimi" --dry-run
-# gerçek tarama
-python3 scan.py --city Ankara --districts "Çankaya" --sectors "kuaför"
-```
-
-* Filtre: puan ≥ 4.3, yorum 10–300, web sitesi yok ya da yalnızca sosyal medya/link sayfası, geçerli telefon, açık işletme.
-* Aynı bölge+sektör **90 gün** tekrar taranmaz (`--force` ile zorlanır). `closed_regions` tablosundaki bölgeler (Bursa) atlanır.
-* Aynı `place_id` ya da telefon ikinci kez eklenmez; "ilgilenmiyor/iptal dedi" diyenler kayıtta kalır, bu yüzden tekrar taramada geri gelmez.
-* Her sorgu en çok `--max-pages` (3) sayfa ≈ 60 sonuç = en çok 3 API çağrısıdır; `--max-queries` (30) toplam çağrıyı sınırlar. Fiyat için Google Maps Platform fiyat sayfasına bakın.
-* Her kayda 0–100 **skor** verilir (puan, yorum, sitesizlik, cep numarası); panel yüksek skoru önce gösterir.
+Bir alanın son yöneticisi kaldırılamaz, düşürülemez ya da başka alana taşınamaz.
 
 ## Panel
 
-vitrinweb. marka diliyle tasarlanmıştır (beyaz zemin, Manrope, lacivert vurgu; bkz. `docs/MARKA.md`). Telefonda alt gezinme çubuğu, bilgisayarda üst menü kullanır. Üstteki ince çubuk haftalık hedefe (100) ilerlemeyi gösterir.
+Telefonda alt gezinme çubuğu, bilgisayarda üst menü. İlk girişte altta kısa bir tanıtım çıkar; üstteki **?** ile tekrar açılır.
 
-**Masaüstü kısayolları:** `W` WhatsApp'tan yaz, `S` şimdilik atla, `N` nota geç. (Sonuç düğmeleri yanlışlıkla basılmasın diye kısayolsuzdur.)
+* **Liste** (WhatsApp / Arama / Takip / Gönderildi): her seferinde tek işletme. WhatsApp'tan yaz ya da ara, sonucu işaretle.
+  İki kişi aynı anda çalışabilir: açılan kart 15 dk kilitlenir. "İlgilenmiyor" derken **sebep** seçilir (raporda görünür).
+  Kısayollar (masaüstü): `W` WhatsApp, `S` atla, `N` not.
+* **Müşteriler:** "İlgilendi" denen işletme **İletişimde**, "Satış oldu" denen **Satış tamamlandı** aşamasıyla otomatik düşer; elle de eklenir.
+  Aşamalar: İletişimde → Anlaşma aşamasında → Satış tamamlandı. Her müşteride **satış kalemleri** (ürün/hizmet, adet, toplam tutar),
+  sıradaki adım, notlar ve tam geçmiş tutulur. Satış eklenince müşteri Satış tamamlandı'ya geçer.
+* **Tara:** şehir, ilçe, sektör (önerilerden seç ya da kendin yaz). **Filtreler isteğe bağlıdır:** en az Google puanı, yorum sayısı aralığı,
+  açık olunması gereken günler. Filtre seçilmezse yalnızca kapalı (geçici/kalıcı) işletmeler ve telefonu olmayanlar atlanır.
+* **Raporlar:** ay seçilir; ulaşılan işletme, olumlu, red, satış, ulaşılamayan, WhatsApp, satış tutarı, bulunan işletme,
+  red sebepleri, sektör/kişi/ürün dağılımı. Altında aranabilir işlem geçmişi.
+* **Ekip:** roller; **Ayarlar** (şirket adı, haftalık hedef, günlük WhatsApp sınırı, sektör önerileri, WhatsApp şablonu);
+  platform yöneticisine **Alanlar**; **Paket**; **Notlar** (aydınlatma metni taslağı).
+* **WhatsApp şablonu** alan ayarıdır; `{isim}` işletme adıyla değişir. Boşsa sohbet boş açılır. Şablon yazılırsa içinde "iptal"
+  yazarak vazgeçme cümlesi bulunması zorunludur (sunucu da denetler).
 
+## 30 gün kuralı
 
-* **Üst menü:** Liste (WhatsApp / Arama / Takip) · Müşteriler · Tara · Geçmiş · Ekip. Menüde yalnızca rolünüzün göreceği bölümler çıkar.
-* **WhatsApp:** yeni + cep numarası. "WhatsApp'tan yaz" hazır mesajla açar, ekip gözden geçirip kendi gönderir; "Broşürü gönder" broşürü panoya kopyalar (bilgisayarda Cmd+V) ya da telefonda paylaşım menüsünü açar; sonra "WhatsApp gönderdim". 3 gün sonra **Takip**'e düşer.
-  WhatsApp'ı olmayan ya da yazmak istemediğiniz kayıt için **"Arama listesine al"**.
-* **Arama:** sabit hatlar + arama listesine alınanlar + açmayanlar (günde bir tekrar, en fazla 3 deneme; sonra "ulaşılamaz").
-* **Takip:** zamanı gelen "sonra ara", WhatsApp'ı 3 gün önce gidenler, ilgilenenler.
-* **Tara:** şehir/ilçe/sektör girip yeni işletme bulur (aşağıda "Panelden tarama").
-* **Geçmiş:** tüm kayıtlar, ad/not/telefonla arama.
-* İki kişi aynı anda çalışabilir: sunucu bir kartı açana 15 dk "kilitler", diğeri başka kart görür.
-* Sayaçlar (hafta/bugün) Türkiye saatiyle ve ekip toplamıdır. Günlük 20 WhatsApp aşılırsa uyarır (engellemez).
-* "İlgilenmiyor" ve "İptal dedi" kalıcıdır, sunucu bir daha işlem yapılmasına izin vermez.
+Hiç işlenmemiş (aranmamış, yazılmamış) işletme kaydı 30 gün sonra listeden düşer ve silinir. İşlenen kayıtlar
+(arandı, açmadı, sonra aranacak, WhatsApp gönderildi, ilgilendi, reddetti…) kalır.
+
+## Panelden tarama (kurulum, bir kez)
+
+1. Supabase > **Edge Functions** > **Deploy a new function** > **Via Editor**. Ad: `scan`. `supabase/functions/scan/index.ts` dosyasının tamamını yapıştırın, **Deploy**.
+2. Fonksiyonun **Settings** bölümünde **Verify JWT** seçeneğini **kapatın**. Giriş kontrolünü fonksiyonun kendisi yapar.
+3. Supabase > Edge Functions > **Secrets**: `GOOGLE_API_KEY` = Google Places anahtarınız.
+4. Google anahtarını Places API ile kısıtlayın; Google Cloud > Faturalama > **Bütçeler ve uyarılar** bölümünden bütçe uyarısı kurun.
+
+* **Günlük sınır:** her alan için günde en çok **60** Google çağrısı (≈20 bölge). Değiştirmek için `MAX_CALLS_PER_DAY` secret'ı.
+* **Başka alan adı:** paneli başka adresten açacaksanız `ALLOWED_ORIGINS` secret'ına ekleyin (virgülle).
+* Aynı bölge+sektör **90 gün** tekrar taranmaz ("yeniden tara" ile zorlanır). Vitrin alanında Bursa kapalı bölgedir.
+* Her kayda 0–100 **öncelik** verilir (Google puanı, yorum sayısı, cep telefonu); liste yüksek öncelikliyi önce gösterir.
+* **Maliyet:** tarama "Text Search Enterprise" çağrısıdır (bir çağrı ≈ 20 sonuç). Güncel fiyat için Google Maps Platform fiyat sayfasına bakın.
 
 ## Güvenlik
 
-* Panele yalnızca *publishable* anahtar konur. **Secret anahtar** sadece `.env`'de (Mac) durur, git'e girmez.
-* Tarayıcı veritabanını yalnızca okuyabilir; her yazma `log_call` vb. fonksiyonlarla olur. Kayıt kapalı, giriş yalnızca eklediğiniz kullanıcılarla.
+* Panele yalnızca *publishable* anahtar konur; secret anahtar hiçbir dosyada yoktur.
+* Tarayıcı veritabanını yalnızca **kendi alanı kadar** okuyabilir; her yazma `log_call`, `add_sale` vb. fonksiyonlarla olur.
 * Site `noindex`, çerçevelenemez, sıkı CSP ile yayınlanır; `supabase-js` sürümü sabit ve bütünlük (SRI) denetimli.
-* `scan.py`, SQL ve testler `public/` dışında olduğundan internetten indirilemez.
-* Tarama servisi yalnızca giriş yapmış ve **tarama izni olan** kullanıcıyı kabul eder, girdileri doğrular ve günlük Google çağrı sınırı koyar. Google anahtarı hiçbir yanıtta görünmez.
+* Tarama servisi yalnızca giriş yapmış ve **tarama izni olan** kullanıcıyı kabul eder, kullanıcının alanına yazar, kota ve günlük sınır uygular.
 
 ## Testler
 
 ```bash
-python3 -m unittest tests.test_scan                  # tarama mantığı (Python)
-node --test tests/scan_edge.test.mjs                 # panelden tarama servisi (Node 22+)
+node --test tests/scan_edge.test.mjs                 # tarama servisi (Node 22+)
 node tests/panel.e2e.mjs                             # panel, gerçek tarayıcıda (playwright gerekir)
-#   ekran görüntüsü: SHOTS=klasör  ·  masaüstü: VIEW=1280x860
+#   ekran görüntüsü: SHOTS=klasör  ·  masaüstü: VIEW=1280x860  ·  tarayıcı yolu: CHROMIUM=/yol/chrome
 #   erişilebilirlik taraması: AXE=node_modules/axe-core/axe.min.js (npm i axe-core)
-PGHOST=... PGUSER=postgres tests/run_sql_tests.sh    # şema + iş kuralları, boş bir Postgres'e karşı
+PGHOST=... PGUSER=postgres tests/run_sql_tests.sh    # şema, alan ayrımı, iş kuralları ve yükseltmeler, boş bir Postgres'e karşı
 ```
 
+`tests/fixtures/schema_v1.sql`, canlıdaki önceki şemadır; ondan yükseltmenin veriyi koruduğu test edilir.
+
 ## Hukuki not
-Cep numaralarına ticari ileti göndermek KVKK ve İYS (6563 sayılı Kanun) kapsamına girebilir. Canlıya geçmeden bir hukukçuya danışın.
-Mesaj şablonundaki "iptal yazmanız yeterli" cümlesi panelde silinemez; "iptal" yazanları "İptal dedi" olarak işaretlemeyi unutmayın.
+
+* Google Maps Platform şartları Places içeriğinin (ad, telefon, puan…) saklanmasına izin vermez; süresiz saklanabilen yalnızca `place_id`'dir.
+  Pilot bu bilinçle mevcut yöntemle yürür; ücretli sürüme geçerken "kart açılınca anlık çekme" modeline geçilecektir.
+* Cep numaralarına ticari ileti göndermek KVKK ve İYS (6563 sayılı Kanun) kapsamına girebilir. Aydınlatma metni taslağı
+  `docs/AYDINLATMA_METNI.md`'dedir ve hukukçu onayı bekler; sorulacak sorular dosyanın sonundadır.
