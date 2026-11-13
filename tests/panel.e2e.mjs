@@ -15,7 +15,8 @@ const fake = fs.readFileSync(new URL('./fake-supabase.js', import.meta.url), 'ut
 
 const [VW, VH] = (process.env.VIEW || '390x844').split('x').map(Number);
 const SHOTS = process.env.SHOTS; if (SHOTS) fs.mkdirSync(SHOTS, { recursive: true });
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const CHROME = process.env.CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const browser = await chromium.launch(fs.existsSync(CHROME) ? { executablePath: CHROME } : {});   // yol yoksa playwright'ın kendi tarayıcısı
 let step = 0; const ok = m => console.log(`ok ${++step} – ${m}`);
 const IGNORED = /Failed to load resource: the server responded with a status of (400|404|429)/;   // sahte servis hataları beklenir
 
@@ -239,6 +240,12 @@ assert.match(await txt('#repTiles'), /7\s*Gönderilen/); assert.match(await txt(
 assert.equal(await page.locator('#histList li').count(), 5); await shot('11-gecmis'); await axe('geçmiş'); ok('geçmiş listesi dolu');
 await page.fill('#histSearch', 'meşgul'); await page.waitForTimeout(500);
 assert.ok((await calls()).some(c => c[0] === 'search_history' && c[1].p_term === 'meşgul')); ok('geçmişte arama sunucuya gider');
+const hdr = await page.evaluate(() => {   // en kötü durum: 3 haneli sayaç ve en uzun rol adı
+  document.getElementById('weekCount').textContent = '100'; document.getElementById('roleBadge').textContent = 'Tasarımcı';
+  const r = id => document.getElementById(id).getBoundingClientRect();
+  return { badgeRight: r('roleBadge').right, goalLeft: Math.min(r('goalBox').left, document.querySelector('.goal-top').getBoundingClientRect().left) };
+});
+assert.ok(hdr.badgeRight <= hdr.goalLeft, `başlıkta rol rozeti sayaçla çakışıyor: ${JSON.stringify(hdr)}`); ok('başlıkta rol rozeti ile haftalık sayaç çakışmaz');
 await page.click('#logout'); await page.waitForSelector('#login:not(.hide)'); ok('çıkış giriş ekranına döner');
 await page.click('#email');
 const sw = await page.evaluate(() => document.documentElement.scrollWidth); assert.ok(sw <= VW, 'yatay taşma: ' + sw); ok(`${VW}px ekranda yatay taşma yok`);

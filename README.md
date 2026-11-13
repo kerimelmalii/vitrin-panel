@@ -1,7 +1,7 @@
 # Vitrin Web – müşteri bulma, satış ve proje takip paneli
 
 Google Haritalar'da puanı yüksek ama web sitesi olmayan işletmeleri bölge bölge bulur; ekip WhatsApp'tan yazar / arar,
-sonuçlar kaydedilir, aranan işletme bir daha çıkmaz. Hedef: haftada ~100 temas, günde en fazla ~25 WhatsApp.
+sonuçlar kaydedilir, aranan işletme bir daha çıkmaz. Hedef: haftada ~100 temas, günde en fazla ~20 WhatsApp.
 
 | Parça | Dosya | Nerede çalışır |
 |---|---|---|

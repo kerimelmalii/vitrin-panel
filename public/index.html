@@ -43,7 +43,7 @@
   .top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:14px;margin-bottom:6px;border-bottom:1px solid var(--line)}
   .brand{display:flex;align-items:center;gap:10px;min-width:0}
   .wordmark-sm{height:22px;width:auto;display:block}
-  .rolebadge{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);border-left:1px solid var(--line);padding-left:10px;white-space:nowrap}
+  .rolebadge{min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);border-left:1px solid var(--line);padding-left:10px;white-space:nowrap}
   .rolebadge:empty{display:none}
   .stats{display:flex;align-items:center;gap:12px}
   .goal{min-width:132px}
@@ -241,7 +241,7 @@
   #toast.on{opacity:1;transform:translate(-50%,0)}
   @media (min-width:860px){#toast{bottom:28px}}
   @media (max-width:600px){dialog.sheet{margin:auto auto 0;border-bottom-left-radius:0;border-bottom-right-radius:0;max-height:94vh}}
-  @media (max-width:480px){.name{font-size:23px}.phone{font-size:27px}.card{padding:18px}.goal .mini{display:none}.goal{min-width:96px}.sheet-in{padding:20px}.tile b{font-size:21px}}
+  @media (max-width:480px){.name{font-size:23px}.phone{font-size:27px}.card{padding:18px}.goal .mini,.goal-lbl{display:none}.goal{min-width:64px}.sheet-in{padding:20px}.tile b{font-size:21px}}
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -291,9 +291,9 @@
       <div class="brand"><img class="wordmark-sm" src="/brand/vitrinweb-1x.png" alt="vitrinweb" width="360" height="66"><span class="rolebadge" id="roleBadge"></span></div>
       <div class="stats">
         <div class="goal hide" id="goalBox" title="Bu hafta yapılan temas / hedef">
-          <div class="goal-top"><b><span id="weekCount">0</span>/<span id="weekGoal">100</span></b><span>bu hafta</span></div>
+          <div class="goal-top"><b><span id="weekCount">0</span>/<span id="weekGoal">100</span></b><span class="goal-lbl">bu hafta</span></div>
           <div class="goal-bar"><i id="goalBar"></i></div>
-          <div class="mini"><span>Bugün <b id="todayCount">0</b></span><span class="wal">WhatsApp <b id="waToday">0</b>/<span id="waLimit">25</span></span></div>
+          <div class="mini"><span>Bugün <b id="todayCount">0</b></span><span class="wal">WhatsApp <b id="waToday">0</b>/<span id="waLimit">20</span></span></div>
         </div>
         <button class="iconbtn" id="logout" aria-label="Çıkış yap" title="Çıkış yap"><svg class="i" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg></button>
       </div>
