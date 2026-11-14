@@ -29,9 +29,9 @@
   const B = o => Object.assign({ address: 'Çankaya/Ankara', city: 'Ankara', district: 'Çankaya', sector: 'kuaför', rating: 4.7, review_count: 50,
     website_status: 'none', lead_score: 80, status: 'new', call_list: false, attempt_count: 0, maps_url: 'https://maps.google.com/?cid=1' }, o);
   const biz = [
-    B({ id: 'm1', name: 'Mavi Kuaför | Çankaya Saç Tasarım', phone_raw: '0532 111 22 33', phone_normalized: '+905321112233', lead_score: 90 }),
+    B({ id: 'm1', name: 'Mavi Kuaför | Çankaya Saç Tasarım', phone_raw: '0532 111 22 33', phone_normalized: '+905321112233', lead_score: 90, category: 'Kuaför' }),
     B({ id: 'm2', name: 'Yeşil Berber', phone_raw: '0533 222 33 44', phone_normalized: '+905332223344', lead_score: 70, maps_url: 'javascript:alert(1)', rating: null, review_count: null }),
-    B({ id: 'l1', name: 'Sabit Diş', sector: 'diş', phone_raw: '0312 123 45 67', phone_normalized: '+903121234567' }),
+    B({ id: 'l1', name: 'Sabit Diş', sector: 'diş', phone_raw: '0312 123 45 67', phone_normalized: '+903121234567', category: 'Diş hekimi' }),
     B({ id: 'f1', name: 'Takip Eczane', sector: 'eczane', status: 'callback', lead_score: 95, attempt_count: 1, phone_raw: '0534 000 00 00', phone_normalized: '+905340000000' }),
   ];
   const isMobile = b => /^\+905\d{9}$/.test(b.phone_normalized);

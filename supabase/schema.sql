@@ -68,6 +68,8 @@ alter table public.businesses
   add column if not exists claimed_at      timestamptz,
   add column if not exists updated_at      timestamptz not null default now(),
   add column if not exists source          text not null default 'google',
+  add column if not exists category        text,                -- Google kategorisi (örn. "Özel hastane", "Diş hekimi")
+  add column if not exists category_type   text,                -- Google tür kodu (örn. hospital, dentist)
   add column if not exists workspace_id    uuid references public.workspaces(id) on delete cascade;
 
 -- Cep numarası mı? (+905XXXXXXXXX) – WhatsApp listesi bununla ayrılır
@@ -603,13 +605,13 @@ begin
   perform public.purge_stale_leads();
   with ins as (
     insert into public.businesses (workspace_id, place_id, name, address, city, district, sector, phone_raw, phone_normalized,
-                                   rating, review_count, website_status, maps_url, lead_score, source)
+                                   rating, review_count, website_status, maps_url, lead_score, source, category, category_type)
     select p_workspace, x.place_id, x.name, x.address, coalesce(x.city, ''), x.district, coalesce(x.sector, ''), x.phone_raw,
            x.phone_normalized, x.rating, x.review_count, coalesce(x.website_status, 'none'), x.maps_url,
-           coalesce(x.lead_score, 0), 'google'
+           coalesce(x.lead_score, 0), 'google', left(nullif(btrim(x.category), ''), 80), left(nullif(btrim(x.category_type), ''), 60)
       from jsonb_to_recordset(p_rows) as x(place_id text, name text, address text, city text, district text,
              sector text, phone_raw text, phone_normalized text, rating numeric, review_count int,
-             website_status text, maps_url text, lead_score int)
+             website_status text, maps_url text, lead_score int, category text, category_type text)
     on conflict do nothing
     returning 1)
   select count(*) into n from ins;

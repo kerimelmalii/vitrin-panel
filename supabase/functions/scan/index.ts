@@ -17,7 +17,8 @@ const PLACES_URL = "https://places.googleapis.com/v1/places:searchText";
 const FIELD_MASK = [
   "places.id", "places.displayName", "places.formattedAddress", "places.nationalPhoneNumber",
   "places.internationalPhoneNumber", "places.rating", "places.userRatingCount", "places.websiteUri",
-  "places.googleMapsUri", "places.businessStatus", "places.regularOpeningHours", "nextPageToken",
+  "places.googleMapsUri", "places.businessStatus", "places.regularOpeningHours",
+  "places.primaryType", "places.primaryTypeDisplayName", "nextPageToken",
 ].join(",");
 export const RESCAN_DAYS = 90;
 const PAGE_SIZE = 20;
@@ -106,15 +107,26 @@ export function openDays(place: any): Set<number> | null {
   return days;
 }
 
+/** Hiçbir sektörde satış hedefi olmayan yer türleri (Google primaryType). Örn. "hastane" aramasında hastanenin otoparkı gelir.
+ *  Eczane, laboratuvar gibi türler bilerek burada değil: başka bir sektörde hedef olabilirler. */
+export const EXCLUDED_TYPES = new Set([
+  "parking", "parking_lot", "parking_garage", "atm", "bus_stop", "bus_station", "transit_station", "subway_station",
+  "train_station", "light_rail_station", "taxi_stand", "ferry_terminal", "electric_vehicle_charging_station",
+  "public_bathroom", "rest_stop", "bicycle_store_parking", "park_and_ride",
+]);
+
 export interface Row {
   place_id: string; name: string; address: string; city: string; district: string | null; sector: string;
   phone_raw: string | null; phone_normalized: string; rating: number | null; review_count: number | null;
   website_status: string; maps_url: string | null; lead_score: number;
+  category: string | null; category_type: string | null;
 }
 
 export function placeToRow(place: any, city: string, district: string, sector: string, filters: Filters = {}): { row?: Row; why?: string } {
   // Her zaman: geçici ya da kalıcı kapalı işletmeler alınmaz
   if (place.businessStatus != null && place.businessStatus !== "OPERATIONAL") return { why: "kapalı" };
+  const ptype: string | null = place.primaryType ?? null;
+  if (ptype && EXCLUDED_TYPES.has(ptype)) return { why: "kategori uygun değil" };
   const rating: number | null = place.rating ?? null, reviews: number | null = place.userRatingCount ?? null;
   // İsteğe bağlı filtreler
   if (filters.min_rating != null && (rating == null || rating < filters.min_rating)) return { why: "puan düşük" };
@@ -139,6 +151,7 @@ export function placeToRow(place: any, city: string, district: string, sector: s
       place_id: place.id, name, address: addr, city, district: district || null, sector, phone_raw: rawPhone,
       phone_normalized: phone, rating, review_count: reviews, website_status: classifyWebsite(place.websiteUri),
       maps_url: place.googleMapsUri ?? null, lead_score: leadScore(rating, reviews, isMobile(phone)),
+      category: (place.primaryTypeDisplayName?.text ?? "").trim().slice(0, 80) || null, category_type: ptype,
     },
   };
 }
