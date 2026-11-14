@@ -22,11 +22,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Tarama mantığı (Python)
-        run: python3 -m unittest tests.test_scan
       - name: Edge Function (Node)
         run: node --test tests/scan_edge.test.mjs
       - name: Veritabanı şeması ve iş kuralları

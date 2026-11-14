@@ -1,11 +1,22 @@
-# Proje özeti ve durum (Ekim 2026)
+# Proje özeti ve durum (Kasım 2026)
 
-**Kapsam:** müşteri bulma (tarama) → arama/WhatsApp → satış → müşteri takibi (aşama, not, tutar) → ekip rolleri. İleride: araç abonelikleri (Claude, GitHub…) yalnızca yöneticilere.
-
-**Amaç:** Vitrin Web için müşteri bulma ve arama sistemi (bkz. README.md).
+**Yön:** Vitrin, web sitesi hizmetini bıraktı; dijital çözümler sunan bir ajansa dönüşüyor. Bu panel, ajansın kendi kullandığı
+ve diğer şirketlere de sunacağı çözümlerden biri: müşteri bulma (tarama) → arama/WhatsApp → müşteri takibi → satış → aylık rapor.
 
 ## Durum
-- Tamam: müşteri hattı (Müşteriler sekmesi), roller (Yönetici/Satış/Tasarımcı) ve Ekip sekmesi; şema (`supabase/schema.sql`), tarama scripti, panelden tarama (Edge Function), yeniden tasarlanan panel (açık/koyu tema, üç liste, Tara sekmesi), otomatik testler, güvenli yayın düzeni.
-- Sizde yapılacak: şemayı Supabase'te çalıştırmak, `reset_test_data.sql`, `.env` doldurmak, dalı `main`'e almak (Vercel yayını), Google bütçe uyarısı, gerçek bölge taraması, arkadaşınızla deneme araması.
-- Dikkat: Google deneme kredisi 5 Ocak 2027'de bitiyor. KVKK/İYS için hukukçu görüşü alın. WhatsApp elle ve düşük hacimde (günde ~20).
-- Açık nokta: panelin `SUPABASE_URL` değeri ile şemayı çalıştırdığınız proje aynı olmalı.
+- **Tamam:** çok şirketli yapı (çalışma alanları, veritabanında zorunlu ayrım), demo sürüm (şerit, paketler, kota), site hizmeti
+  izlerinin kaldırılması, isteğe bağlı tarama filtreleri (puan, yorum, çalışma günü), ret sebepleri, satış kalemleri (ürün/adet/tutar),
+  sade müşteri aşamaları, aylık rapor, 30 gün kuralı, ilk giriş tanıtımı, alan ayarları (şablon, sektörler, hedef), aydınlatma metni taslağı.
+- **Pilot:** demo alan, aylık 500 işletme kotası. Kurulum adımları README > "Bu sürüme geçiş".
+- **Paketler (taslak):** Başlangıç 500 TL, Standart 1.000 TL, Profesyonel 2.000 TL / ay. İçerikleri henüz belirlenmedi (demo'da kilitli görünür).
+
+## Sonraya kalanlar
+- Ücretli sürüm: Google şartlarına uygun "yalnızca `place_id` sakla, kart açılınca anlık çek" modeli; kart başına kredi.
+- Sales Pilot ile birleştirme.
+- Ödeme altyapısı (iyzico/PayTR) ve e-fatura; Vercel ve Supabase'in ücretli planları (ticari kullanım).
+- Açık veri kaynaklarından içe aktarma (belediye portalları vb.).
+
+## Dikkat
+- Google deneme kredisi 5 Ocak 2027'de bitiyor; Google Cloud'da bütçe uyarısı ve günlük kota sınırı kurulmalı.
+- KVKK/İYS ve Google şartları için hukukçu görüşü (sorular `docs/AYDINLATMA_METNI.md` sonunda).
+- WhatsApp elle ve düşük hacimde (günde ~20).

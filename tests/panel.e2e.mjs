@@ -15,11 +15,12 @@ const fake = fs.readFileSync(new URL('./fake-supabase.js', import.meta.url), 'ut
 
 const [VW, VH] = (process.env.VIEW || '390x844').split('x').map(Number);
 const SHOTS = process.env.SHOTS; if (SHOTS) fs.mkdirSync(SHOTS, { recursive: true });
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const CHROME = process.env.CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const browser = await chromium.launch(fs.existsSync(CHROME) ? { executablePath: CHROME } : {});   // yol yoksa playwright'ın kendi tarayıcısı
 let step = 0; const ok = m => console.log(`ok ${++step} – ${m}`);
 const IGNORED = /Failed to load resource: the server responded with a status of (400|404|429)/;   // sahte servis hataları beklenir
 
-async function mk({ role = 'admin', preLogged = false, accessError = false } = {}) {
+async function mk({ role = 'admin', preLogged = false, accessError = false, ws = 'platform', intro = false } = {}) {
   const ctx = await browser.newContext({ viewport: { width: VW, height: VH }, colorScheme: 'light' });
   const page = await ctx.newPage(); const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
@@ -35,10 +36,11 @@ async function mk({ role = 'admin', preLogged = false, accessError = false } = {
     }
     return r.fulfill({ status: 404, body: 'yok' });
   });
-  await page.addInitScript(([role, preLogged, accessError]) => {
-    window.__role = role; window.__preLogged = preLogged; window.__accessError = accessError; window.__opened = [];
+  await page.addInitScript(([role, preLogged, accessError, ws, intro]) => {
+    window.__role = role; window.__preLogged = preLogged; window.__accessError = accessError; window.__ws = ws; window.__opened = [];
     window.open = u => { window.__opened.push(u); return null; };
-  }, [role, preLogged, accessError]);
+    if (!intro) try { localStorage.setItem('vitrin_intro_v1_u1', '1'); } catch (e) {}
+  }, [role, preLogged, accessError, ws, intro]);
   const t = {
     txt: sel => page.locator(sel).innerText(),
     raw: sel => page.locator(sel).textContent(),   // CSS büyük harf dönüşümünden etkilenmez
@@ -60,8 +62,8 @@ async function mk({ role = 'admin', preLogged = false, accessError = false } = {
   return { ctx, page, errors, t };
 }
 
-// =============================================================== 1) YÖNETİCİ: tam akış
-const { ctx, page, errors, t } = await mk();
+// =============================================================== 1) YÖNETİCİ (Vitrin, platform): tam akış
+const { ctx, page, errors, t } = await mk({ intro: true });
 const { txt, raw, calls, count, last, vis, shot, axe } = t;
 
 await page.goto('https://panel.test/');
@@ -71,12 +73,23 @@ await page.waitForFunction(() => document.getElementById('loginErr').textContent
 await page.fill('#password', 'dogru'); await page.click('#loginForm button');
 await page.waitForSelector('#biz:not(.hide)'); ok('giriş sonrası kart geldi');
 
-assert.equal(await raw('#roleBadge'), 'Yönetici');
-assert.equal(await page.locator('#tabs [data-nav]:not(.hide)').count(), 5); ok('yönetici beş bölümü de görür, rol rozeti görünür');
-assert.equal(await txt('#n_customers'), '1'); ok('müşteriler rozeti üretimdeki müşteri sayısını gösterir (satır indirmeden, sayım sorgusuyla)');
+// İlk giriş tanıtımı: altta, adım adım; kapatınca bir daha çıkmaz, ? ile tekrar açılır
+await page.waitForSelector('#intro:not(.hide)'); assert.match(await txt('#introT'), /Yeni müşteri bul/);
+assert.equal(await page.locator('#introPg i').count(), 4); await shot('02-tanitim'); await axe('tanıtım');
+for (let i = 0; i < 3; i++) await page.click('#introNext');
+assert.match(await txt('#introNext'), /Anladım/); await page.click('#introNext');
+assert.equal(await vis('#intro'), false); assert.equal(await page.evaluate(() => localStorage.getItem('vitrin_intro_v1_u1')), '1');
+await page.click('#helpBtn'); assert.equal(await vis('#intro'), true); await page.click('#introSkip'); assert.equal(await vis('#intro'), false);
+ok('ilk giriş tanıtımı: dört adım, "Anladım" ile kapanır, hatırlanır, ? ile yeniden açılır');
 
-await page.waitForTimeout(700); await shot('02-whatsapp'); await axe('whatsapp kartı');
+assert.equal(await raw('#roleBadge'), 'Yönetici'); assert.equal(await vis('#demoBar'), false);
+assert.equal(await page.locator('#tabs [data-nav]:not(.hide)').count(), 5); ok('platform yöneticisi beş bölümü görür, demo şeridi yok');
+assert.equal(await txt('#n_customers'), '1'); ok('müşteriler rozeti devam eden müşteri sayısını gösterir (sayım sorgusuyla)');
+
+await page.waitForTimeout(700); await shot('03-whatsapp'); await axe('whatsapp kartı');
 assert.equal(await txt('#bName'), 'Mavi Kuaför | Çankaya Saç Tasarım'); ok('en yüksek skorlu cep numarası WhatsApp listesinde ilk');
+assert.doesNotMatch(await txt('#bTags'), /Web sitesi/); assert.match(await txt('#biz'), /Kaynak: Google Haritalar/);
+assert.equal(await page.locator('#brBtn').count(), 0); ok('site hizmeti izleri yok (site rozeti, broşür); Google kaynak belirtimi var');
 assert.match(await txt('#n_whatsapp'), /2/); assert.match(await txt('#n_call'), /1/); assert.match(await txt('#n_followup'), /1/);
 assert.equal(await txt('#n_lists'), '4'); ok('liste sayaçları 2/1/1, toplam rozet 4');
 assert.equal(await txt('#weekCount'), '7'); ok('haftalık sayaç sunucudan');
@@ -84,14 +97,13 @@ await page.click('#waBtn');
 const url = (await page.evaluate(() => window.__opened))[0];
 assert.ok(url.startsWith('https://web.whatsapp.com/send?phone=905321112233&text='), url);
 const msg = decodeURIComponent(url.split('text=')[1]);
-assert.ok(msg.startsWith('Merhaba,') && msg.includes('"iptal" yazmanız') && msg.includes('ekteki broşürde'), msg); ok('WhatsApp linki: numara + varsayılan mesaj + "iptal" cümlesi');
-assert.equal(await vis('#brBtn'), true); await page.click('#brBtn');
-await page.waitForFunction(() => /Broşür (kopyalandı|indirildi)/.test(document.getElementById('toast').textContent)); ok('broşür düğmesi cep numarasında görünür ve çalışır');
+assert.ok(msg.startsWith('Merhaba Mavi Kuaför,') && msg.includes('"iptal"'), msg); ok('WhatsApp linki: numara + alanın şablonu ({isim} kısa adla)');
 await page.click('#toCallList'); await page.waitForFunction(() => document.getElementById('bName').textContent === 'Yeşil Berber');
 assert.equal(await count('move_to_call_list'), 1); assert.match(await txt('#n_call'), /2/); ok('arama listesine alma çalışıyor');
 assert.equal(await vis('#bMaps'), false); ok('javascript: harita bağlantısı gizlendi');
+assert.doesNotMatch(await txt('#bTags'), /yorum/); ok('puanı olmayan işletmede puan etiketi yok');
 await page.click('#btnWaSent'); await page.waitForFunction(() => !document.getElementById('empty').classList.contains('hide'));
-await shot('03-bos'); assert.equal((await last('log_call'))[1].p_outcome, 'wa_sent'); assert.equal(await txt('#waToday'), '1'); ok('WhatsApp gönderildi kaydedildi, sayaç arttı, boş durum');
+await shot('04-bos'); assert.equal((await last('log_call'))[1].p_outcome, 'wa_sent'); assert.equal(await txt('#waToday'), '1'); ok('WhatsApp gönderildi kaydedildi, sayaç arttı, boş durum');
 
 assert.equal(await txt('#n_sent'), '1');
 await page.click('[data-tab="sent"]'); await page.waitForSelector('#sentList li[role="button"]');
@@ -104,7 +116,8 @@ await page.click('#backSent'); await page.waitForSelector('#sentList li[role="bu
 await page.click('#sentList li[role="button"]'); await page.waitForFunction(() => document.getElementById('bName').textContent === 'Yeşil Berber');
 await page.fill('#note', 'geri döndü'); await page.click('[data-o="interested"]');
 await page.waitForFunction(() => /Gönderilen kayıt yok/.test(document.getElementById('sentList').textContent));
-assert.equal((await last('log_call'))[1].p_outcome, 'interested');ok('Gönderildi sekmesi: gönderilen kayıt açılıp sonucu değiştirilebiliyor');
+assert.equal((await last('log_call'))[1].p_outcome, 'interested');
+await page.waitForFunction(() => document.getElementById('n_customers').textContent === '2'); ok('Gönderildi: sonuç değiştirilebilir; "İlgilendi" müşteriyi İletişimde aşamasıyla ekler');
 
 await page.click('[data-tab="call"]'); await page.waitForFunction(() => document.getElementById('bName').textContent.startsWith('Mavi'));
 assert.equal(await vis('#toCallList'), false); ok('arama listesine alınan cep numarası Arama sekmesinde');
@@ -123,52 +136,66 @@ await page.fill('#note', 'Kurumsal paket');
 await page.click('[data-o="won"]'); await page.waitForFunction(() => document.getElementById('bName').textContent !== 'Takip Eczane');
 assert.equal((await last('log_call'))[1].p_outcome, 'won');
 await page.waitForFunction(() => document.getElementById('toast').textContent.includes('Müşteriler'));
-await page.waitForFunction(() => document.getElementById('n_customers').textContent === '2'); ok('"Satış oldu" müşteri oluşturur, rozet güncellenir');
+await page.waitForFunction(() => document.getElementById('n_customers').textContent === '2'); ok('"Satış oldu" müşteri oluşturur (Satış tamamlandı, devam edenlere sayılmaz)');
 
-// kalıcı çıkarma: özel onay penceresi
+// Ret: sebep seçilmeden kaydedilmez; vazgeç kayıt yapmaz; sebep sunucuya gider
 await page.waitForFunction(() => document.getElementById('bName').textContent === 'Sabit Diş');
 { const before = await count('log_call');
-  await page.click('#closeMenu summary'); await page.click('[data-o="rejected"]'); await page.waitForSelector('#dlg[open]');
-  await page.click('#dlg button[value="cancel"]'); await page.waitForFunction(() => !document.getElementById('dlg').open);
-  assert.equal(await count('log_call'), before); ok('onayda "Vazgeç" kaydı engeller'); }
-await page.click('[data-o="do_not_contact"]');
-await page.waitForSelector('#dlg[open]'); assert.match(await txt('#dlgText'), /Sabit Diş/); await shot('04-onay');
-await page.click('#dlgOk'); await page.waitForFunction(() => !document.getElementById('empty').classList.contains('hide'));
-assert.equal((await last('log_call'))[1].p_outcome, 'do_not_contact'); ok('"iptal dedi" özel onay penceresiyle kaydedildi');
+  await page.click('#closeMenu summary'); await page.click('[data-o="rejected"]'); await page.waitForSelector('#rejBox:not(.hide)');
+  assert.equal(await page.locator('#rejChips .chip').count(), 6); await shot('05-ret-sebebi'); await axe('ret sebebi');
+  await page.click('#rejSave'); await page.waitForFunction(() => document.getElementById('toast').textContent.includes('Bir sebep seçin'));
+  await page.click('#rejCancel'); assert.equal(await vis('#rejBox'), false);
+  assert.equal(await count('log_call'), before); ok('ret: sebep seçmeden kaydedilmez, "Vazgeç" kayıt yapmaz'); }
+await page.click('#closeMenu summary'); await page.click('[data-o="rejected"]');
+await page.click('#rejChips .chip:text-is("Fiyat yüksek")'); await page.click('#rejSave');
+await page.waitForFunction(() => !document.getElementById('empty').classList.contains('hide'));
+{ const rj = (await last('log_call'))[1]; assert.deepEqual([rj.p_outcome, rj.p_reason], ['rejected', 'price']); } ok('"İlgilenmiyor" ret sebebiyle kaydedildi');
 
 // =============================================================== MÜŞTERİLER
 await page.click('[data-nav="customers"]'); await page.waitForSelector('.cust');
-assert.equal(await page.locator('.cust').count(), 2); assert.match(await txt('#stageBar'), /Tümü\s*2/);
-assert.match(await txt('#custTiles'), /2\s+müşteri/); assert.match(await txt('#custTiles'), /1\s+üretimde/);
+assert.equal(await page.locator('.cust').count(), 3); assert.match(await txt('#stageBar'), /Tümü\s*3/); assert.match(await txt('#stageBar'), /Anlaşmada\s*1/);
+assert.match(await txt('#custTiles'), /3\s+müşteri/); assert.match(await txt('#custTiles'), /1\s+anlaşma aşamasında/); assert.match(await txt('#custTiles'), /5\.000/);
 assert.ok((await page.evaluate(() => window.__ranges || [])).some(r => r[0] === 'v_customers' && r[1] === 0 && r[2] === 999)); assert.equal(await vis('#custTrunc'), false);
-assert.ok(await page.locator('.cust .cust-meta .bad').count() >= 1); await shot('05-musteriler'); await axe('müşteriler'); ok('müşteri panosu: aşama sayaçları, özet, geciken adım kırmızı');
+assert.ok(await page.locator('.cust .cust-meta .bad').count() >= 1); await shot('06-musteriler'); await axe('müşteriler'); ok('müşteri panosu: üç aşama, özet (toplam satış), geciken adım kırmızı');
 await page.fill('#custSearch', 'ESKİ'); await page.waitForFunction(() => document.querySelectorAll('.cust').length === 1);
-assert.match(await txt('.cust'), /Eski Müşteri/); await page.fill('#custSearch', ''); await page.waitForFunction(() => document.querySelectorAll('.cust').length === 2); ok('Türkçe büyük/küçük harfe duyarsız arama');
+assert.match(await txt('.cust'), /Eski Müşteri/); await page.fill('#custSearch', ''); await page.waitForFunction(() => document.querySelectorAll('.cust').length === 3); ok('Türkçe büyük/küçük harfe duyarsız arama');
 
-await page.click('.cust:has-text("Takip Eczane")'); await page.waitForSelector('#cdlg[open]');
-assert.equal(await txt('#cName'), 'Takip Eczane'); assert.equal(await page.getAttribute('#cCall', 'href'), 'tel:05340000000'); assert.equal(await page.getAttribute('#cWa', 'href'), 'https://wa.me/905340000000');
+await page.click('.cust:has-text("Yeşil Berber")'); await page.waitForSelector('#cdlg[open]');
+assert.equal(await txt('#cName'), 'Yeşil Berber'); assert.equal(await page.getAttribute('#cWa', 'href'), 'https://wa.me/905332223344');
 await page.waitForFunction(() => document.querySelector('#cTimeline li'));
-assert.match(await txt('#cTimeline'), /Satış kaydedildi\s+Kurumsal paket/); await shot('06-musteri-detay'); await axe('müşteri detayı'); ok('müşteri detayı: iletişim düğmeleri ve başlangıç notu (satış notu taşındı)');
-await page.click('#cStages .chip:text-is("Site tasarlanıyor")'); assert.equal(await vis('#stageBox'), true);
-await page.fill('#stageNote', 'Logo bekleniyor'); await page.click('#stageSave');
-await page.waitForFunction(() => /Satış gerçekleşti → Site tasarlanıyor/.test(document.querySelector('#cTimeline li')?.textContent || ''));
-const st = (await last('set_customer_stage'))[1]; assert.deepEqual([st.p_stage, st.p_note], ['designing', 'Logo bekleniyor']);
-assert.match(await txt('#cTimeline li:first-child'), /Logo bekleniyor/); ok('aşama değişir, not zaman çizelgesine yazılır');
-await page.fill('#fAmount', 'abc'); await page.click('#fSave');
-await page.waitForFunction(() => document.getElementById('toast').textContent.includes('Tutarı sayı olarak')); assert.equal(await count('update_customer'), 0); ok('geçersiz tutar sunucuya gitmez');
-await page.fill('#fAmount', '7500'); await page.fill('#fDomain', 'eczane.com'); await page.fill('#fNext', 'Logo iste'); await page.fill('#fNextAt', '2026-12-01'); await page.click('#fSave');
+assert.match(await txt('#cTimeline'), /İlgilendi, iletişime geçildi\s+geri döndü/); assert.match(await txt('#cSales'), /Henüz satış girilmedi/);
+assert.equal(await page.locator('#cStages .chip').count(), 3); assert.equal(await page.locator('#fAmount, #fDomain').count(), 0);
+ok('müşteri detayı: üç aşama, görüşme notu taşındı, tutar/alan adı alanı yok');
+await page.click('#cStages .chip:text-is("Anlaşma aşamasında")'); assert.equal(await vis('#stageBox'), true);
+await page.fill('#stageNote', 'Teklif gönderildi'); await page.click('#stageSave');
+await page.waitForFunction(() => /İletişimde → Anlaşma aşamasında/.test(document.querySelector('#cTimeline li')?.textContent || ''));
+const st = (await last('set_customer_stage'))[1]; assert.deepEqual([st.p_stage, st.p_note], ['negotiating', 'Teklif gönderildi']); ok('aşama değişir, not zaman çizelgesine yazılır');
+// satış kalemleri
+await page.fill('#sProduct', 'Danışmanlık paketi'); await page.fill('#sQty', '2'); await page.fill('#sAmount', 'abc'); await page.click('#sAdd');
+await page.waitForFunction(() => document.getElementById('toast').textContent.includes('Tutarı sayı olarak')); assert.equal(await count('add_sale'), 0); ok('geçersiz tutar sunucuya gitmez');
+await page.fill('#sAmount', '3.000,50'); await page.click('#sAdd');
+await page.waitForFunction(() => /2 × Danışmanlık paketi/.test(document.getElementById('cSales').textContent));
+const sa = (await last('add_sale'))[1]; assert.deepEqual([sa.p_product, sa.p_quantity, sa.p_amount], ['Danışmanlık paketi', 2, 3000.5]);
+assert.match(await txt('#cSalesTotal'), /3\.000,50/); assert.match(await txt('#cStages .chip.cur'), /Satış tamamlandı/);
+await shot('07-musteri-detay'); await axe('müşteri detayı'); ok('satış kalemi (ürün, adet, tutar) eklenir; toplam görünür; aşama Satış tamamlandı olur');
+await page.fill('#sProduct', 'Eğitim'); await page.fill('#sAmount', '1000'); await page.click('#sAdd');
+await page.waitForFunction(() => document.querySelectorAll('#cSales li').length === 2);
+await page.click('#cSales li:has-text("Eğitim") .x'); await page.waitForSelector('#dlg[open]'); await page.click('#dlgOk');
+await page.waitForFunction(() => document.querySelectorAll('#cSales li').length === 1); assert.equal(await count('delete_sale'), 1); ok('satış onayla silinir');
+await page.fill('#fNext', 'Sözleşme gönder'); await page.fill('#fNextAt', '2026-12-01'); await page.click('#fSave');
 await page.waitForFunction(() => /Güncellendi/.test(document.querySelector('#cTimeline li')?.textContent || ''));
-const up = (await last('update_customer'))[1].p_patch; assert.equal(up.amount, '7500'); assert.equal(up.domain, 'eczane.com'); assert.equal(up.next_step, 'Logo iste'); assert.match(up.next_step_at, /^2026-12-01/);
-await page.click('#fSave'); await page.waitForFunction(() => document.getElementById('toast').textContent.includes('Değişiklik yok')); ok('bilgiler yalnızca değişen alanlarla kaydedilir');
+const up = (await last('update_customer'))[1].p_patch; assert.equal(up.next_step, 'Sözleşme gönder'); assert.match(up.next_step_at, /^2026-12-01/);
+await page.click('#fSave'); await page.waitForFunction(() => document.getElementById('toast').textContent.includes('Değişiklik yok')); ok('takip bilgileri yalnızca değişen alanlarla kaydedilir');
 await page.click('#nChips .chip:text-is("Ödeme alındı")'); await page.fill('#nNote', 'Ödeme alındı\nIBAN ile'); await page.click('#nAdd');
 await page.waitForFunction(() => /IBAN ile/.test(document.querySelector('#cTimeline li')?.textContent || '')); assert.equal(await page.inputValue('#nNote'), ''); ok('not eklenir ve en üste gelir');
 await page.click('#cClose'); await page.waitForFunction(() => !document.getElementById('cdlg').open);
-assert.match(await txt('.cust:has-text("Takip Eczane")'), /Site tasarlanıyor/); assert.match(await txt('.cust:has-text("Takip Eczane")'), /7\.500/); ok('liste kartı yeni aşama ve tutarı gösterir');
-await page.click('#stageBar .chip:has-text("Tasarım")'); assert.equal(await page.locator('.cust').count(), 2); ok('aşama filtresi çalışır');
+assert.match(await txt('.cust:has-text("Yeşil Berber")'), /Satış tamamlandı/); assert.match(await txt('.cust:has-text("Yeşil Berber")'), /3\.001/); ok('liste kartı yeni aşama ve satış toplamını gösterir');
+await page.click('#stageBar .chip:has-text("Anlaşmada")'); assert.equal(await page.locator('.cust').count(), 1); ok('aşama filtresi çalışır');
+await page.click('#stageBar .chip:has-text("Tümü")');
 await page.click('#custAdd'); await page.waitForSelector('#adlg[open]');
-await page.fill('#aName', 'Elle Kafe'); await page.fill('#aPhone', '0532 999 88 77'); await page.fill('#aAmount', '12000'); await page.fill('#aNote', 'Tanıdık yoluyla'); await page.click('#aForm button:not([type="button"])');
-await page.waitForFunction(() => document.querySelectorAll('.cust').length === 3);
-const cc = (await last('create_customer'))[1]; assert.deepEqual([cc.p_name, cc.p_amount, cc.p_note], ['Elle Kafe', 12000, 'Tanıdık yoluyla']); ok('elle müşteri eklenir');
+await page.fill('#aName', 'Elle Kafe'); await page.fill('#aPhone', '0532 999 88 77'); await page.fill('#aNote', 'Tanıdık yoluyla'); await page.click('#aForm button:not([type="button"])');
+await page.waitForFunction(() => document.querySelectorAll('.cust').length === 4);
+const cc = (await last('create_customer'))[1]; assert.deepEqual([cc.p_name, cc.p_note, 'p_amount' in cc], ['Elle Kafe', 'Tanıdık yoluyla', false]); ok('elle müşteri eklenir');
 
 // =============================================================== TARAMA (Edge Function sahte)
 const scanCalls = []; let scanMode = 'ok';
@@ -181,34 +208,40 @@ await page.route('**/functions/v1/scan', async route => {
   if (scanMode === 'missing') return route.fulfill({ status: 404, headers: cors, body: 'not found' });
   if (b.action === 'plan') {
     if (b.city.toLowerCase() === 'mars') return J(400, { error: 'bad_city', message: 'Şehir tanınmadı. 81 ilden birini yazın (örn. Ankara).' });
-    return J(200, { city: 'Ankara', usage: { used: 3, limit: 60 }, est_calls: 6, fits_today: 1, units: [
+    return J(200, { city: 'Ankara', usage: { used: 3, limit: 60 }, quota: { limit: null, used: 31, left: null }, est_calls: 6, fits_today: 1, units: [
       { district: 'Çankaya', sector: 'kuaför', status: 'recent' }, { district: 'Keçiören', sector: 'kuaför', status: 'scan' }, { district: 'Yenimahalle', sector: 'kuaför', status: 'scan' }, { district: 'Mamak', sector: 'kuaför', status: 'closed' }] });
   }
   if (scanMode === 'slow') await new Promise(r => setTimeout(r, 400));
   if (scanMode === 'fail' && b.district === 'Yenimahalle') return J(429, { error: 'daily_limit', message: 'Günlük Google çağrı sınırına ulaşıldı (60). Yarın devam edin.' });
   return J(200, { city: b.city, district: b.district, sector: b.sector, found: 60, matched: 31, saved: 31, calls: 3, reasons: {}, warning: null, used: 6, limit: 60 });
 });
-const reload = async () => { await page.click('[data-nav="lists"]'); await page.click('[data-nav="scan"]'); await page.waitForSelector('#scanView:not(.hide)'); };
 
 await page.click('[data-nav="scan"]'); await page.waitForSelector('#scanView:not(.hide)');
-assert.equal(await vis('#biz'), false); assert.equal(await page.locator('#scHist li').count(), 1); ok('Tara sekmesi açıldı, son taramalar listelendi');
-await shot('07-tara'); await axe('tara');
-await page.click('#sectorChips .chip:text-is("kuaför")'); assert.equal(await page.inputValue('#scSectors'), 'kuaför'); ok('sektör çipi alanı doldurur');
+assert.equal(await vis('#biz'), false); assert.equal(await page.locator('#scHist li').count(), 1); assert.equal(await vis('#scQuota'), false);
+assert.doesNotMatch(await txt('#scanView'), /Web sitesi olmayan/); ok('Tara sekmesi açıldı, son taramalar listelendi; sınırsız alanda kota satırı yok');
+await shot('08-tara'); await axe('tara');
+assert.equal(await page.locator('#sectorChips .chip').count(), 3);
+await page.click('#sectorChips .chip:text-is("kuaför")'); assert.equal(await page.inputValue('#scSectors'), 'kuaför'); ok('sektör çipleri alanın ayarından gelir ve alanı doldurur');
 await page.fill('#scCity', 'mars'); await page.click('#scPlan');
 await page.waitForFunction(() => document.getElementById('toast').textContent.includes('Şehir tanınmadı')); assert.equal(await vis('#scRun'), false); ok('geçersiz şehir anlaşılır hata verir');
 await page.fill('#scCity', 'ankara'); await page.fill('#scDistricts', 'çankaya, keçiören, yenimahalle, mamak'); await page.click('#scPlan');
 await page.waitForSelector('#scRun:not(.hide)');
 const planTxt = await txt('#scPlanBox'); assert.match(planTxt, /Keçiören · kuaför\s+taranacak/); assert.match(planTxt, /Mamak · kuaför\s+kapalı bölge/);
-assert.match(await txt('#scTiles'), /3\/60/); assert.match(await txt('#scTiles'), /2\s+taranacak bölge/); await shot('08-plan');
+assert.match(await txt('#scTiles'), /3\/60/); assert.match(await txt('#scTiles'), /2\s+taranacak bölge/); await shot('09-plan');
 assert.match(await txt('#scRun'), /2 bölge/); assert.match(planTxt, /bugün en çok ~1 bölge taranabilir/);
-assert.equal(scanCalls[0].auth, 'Bearer tok'); assert.ok(scanCalls[0].apikey.startsWith('sb_publishable_')); ok('plan: taranacak/atlanacak ayrımı, günlük sınır uyarısı, oturum bilgisi gönderilir');
+assert.equal(scanCalls[0].auth, 'Bearer tok'); assert.ok(scanCalls[0].apikey.startsWith('sb_publishable_')); assert.deepEqual(scanCalls.at(-1).filters, {});
+ok('plan: taranacak/atlanacak ayrımı, günlük sınır uyarısı, oturum bilgisi; filtre seçilmezse boş gider');
 await page.click('#scRun'); await page.waitForFunction(() => document.getElementById('scLog').textContent.includes('Özet'));
-await shot('09-tarama-bitti');
+await shot('10-tarama-bitti');
 const runs = scanCalls.filter(c => c.action === 'run'); assert.deepEqual(runs.map(r => r.district), ['Keçiören', 'Yenimahalle']); assert.equal(runs[0].city, 'Ankara'); assert.equal(runs[0].force, false);
 assert.match(await txt('#scLog'), /62 yeni kaydedildi, 6 Google çağrısı/); assert.equal(await vis('#scProg'), false); assert.equal(await page.locator('#scCity').isDisabled(), false); ok('tarama sırayla çalışır, özet yazılır, form tekrar açılır');
+// isteğe bağlı filtreler
+await page.click('#scFilters summary'); await page.selectOption('#fMinRating', '4.3'); await page.fill('#fMinRev', '10'); await page.fill('#fMaxRev', '300');
+await page.click('#fDays .chip:text-is("Cmt")'); assert.match(await txt('#fltSum'), /4 filtre/); assert.equal(await vis('#scPlanWrap'), false);
 await page.check('#scForce'); await page.click('#scPlan'); await page.waitForSelector('#scRun:not(.hide)');
 assert.match(await txt('#scRun'), /3 bölge/); scanCalls.length = 0; await page.click('#scRun'); await page.waitForFunction(() => document.getElementById('scLog').textContent.includes('Özet'));
-assert.equal(scanCalls.filter(c => c.action === 'run').every(c => c.force === true), true); ok('"yeniden tara" 90 gün kuralını aşar ve force gönderir');
+const fr = scanCalls.filter(c => c.action === 'run'); assert.equal(fr.every(c => c.force === true), true);
+assert.deepEqual(fr[0].filters, { min_rating: 4.3, min_reviews: 10, max_reviews: 300, open_days: [6] }); ok('filtreler (puan, yorum, çalışma günü) taramaya gider; "yeniden tara" force gönderir');
 await page.uncheck('#scForce');
 scanMode = 'fail'; await page.click('#scPlan'); await page.waitForSelector('#scRun:not(.hide)'); await page.click('#scRun');
 await page.waitForFunction(() => document.getElementById('scLog').textContent.includes('Özet'));
@@ -221,54 +254,113 @@ scanMode = 'missing'; await page.click('#scPlan');
 await page.waitForFunction(() => document.getElementById('toast').textContent.includes('kurulu değil')); ok('servis yoksa kurulum yönlendirmesi gösterilir');
 scanMode = 'ok';
 
-// =============================================================== EKİP
+// =============================================================== EKİP, AYARLAR, ALANLAR
 await page.click('[data-nav="team"]'); await page.waitForSelector('.trow');
-assert.equal(await page.locator('.trow').count(), 3); assert.match(await txt('#teamList'), /Kerim \(siz\)/); assert.match(await txt('#teamView'), /Abonelikler \(yakında\)/);
-await shot('10-ekip'); await axe('ekip'); ok('ekip listesi, kendi satırında "(siz)", abonelik yer tutucusu');
-await page.selectOption('.trow:nth-child(3) select', 'designer'); await page.fill('.trow:nth-child(3) input', 'Ayşe'); await page.click('.trow:nth-child(3) button');
+assert.equal(await page.locator('.trow').count(), 4); assert.match(await txt('#teamList'), /Kerim \(siz\)/);
+assert.equal(await vis('#wsAdminBox'), true); assert.equal(await page.locator('.trow:nth-child(1) select').count(), 2);
+await shot('11-ekip'); await axe('ekip'); ok('platform yöneticisi: herkes listelenir, alan seçimi ve Alanlar bölümü görünür');
+await page.selectOption('.trow:nth-child(3) select >> nth=0', 'w1'); await page.selectOption('.trow:nth-child(3) select >> nth=1', 'admin');
+await page.fill('.trow:nth-child(3) input', 'Ayşe'); await page.click('.trow:nth-child(3) button');
 await page.waitForFunction(() => document.getElementById('toast').textContent.includes('Yetki güncellendi'));
-const sr = (await last('set_user_role'))[1]; assert.deepEqual([sr.p_user, sr.p_role, sr.p_name], ['u3', 'designer', 'Ayşe']); ok('rol atanır');
-await page.selectOption('.trow:nth-child(2) select', 'none'); await page.click('.trow:nth-child(2) button'); await page.waitForSelector('#dlg[open]');
+const sr = (await last('set_user_role'))[1]; assert.deepEqual([sr.p_user, sr.p_role, sr.p_name, sr.p_workspace], ['u3', 'admin', 'Ayşe', 'w1']); ok('kullanıcı pilot alanına yönetici olarak atanır');
+await page.waitForSelector('.trow'); await page.selectOption('.trow:nth-child(2) select >> nth=1', 'none'); await page.click('.trow:nth-child(2) button'); await page.waitForSelector('#dlg[open]');
 assert.match(await txt('#dlgText'), /arkadas@vitrin\.test/); assert.equal(await count('set_user_role'), 1);
 await page.click('#dlgOk'); await page.waitForFunction(() => window.__calls.filter(c => c[0] === 'set_user_role').length === 2);
 assert.equal((await last('set_user_role'))[1].p_role, 'none'); ok('yetki kaldırma onay ister');
+// alanlar
+assert.equal(await page.locator('#wsList .wsrow').count(), 2); assert.match(await txt('#wsList'), /Pilot Şirket[\s\S]*120\/500 işletme[\s\S]*Demo/);
+await page.fill('#wsList .wsrow:nth-child(2) input[type="number"]', '750'); await page.click('#wsList .wsrow:nth-child(2) button');
+await page.waitForFunction(() => document.getElementById('toast').textContent.includes('Alan güncellendi'));
+assert.deepEqual((await last('update_workspace'))[1], { p_ws: 'w1', p_patch: { is_demo: true, lead_quota: '750' } }); ok('platform yöneticisi alanın kotasını ve demo durumunu değiştirir');
+await page.fill('#nwName', 'Yeni Şirket'); await page.fill('#nwQuota', '250'); await page.click('#nwCreate');
+await page.waitForFunction(() => document.querySelectorAll('#wsList .wsrow').length === 3);
+assert.deepEqual((await last('create_workspace'))[1], { p_name: 'Yeni Şirket', p_is_demo: true, p_quota: 250 }); ok('yeni alan (şirket) açılır');
+// ayarlar
+assert.equal(await page.inputValue('#sGoal'), '100'); assert.match(await page.inputValue('#sTpl'), /iptal/);
+await page.fill('#sTpl', 'Merhaba {isim}'); await page.click('#sSave');
+await page.waitForFunction(() => document.getElementById('toast').textContent.includes('"iptal"')); assert.equal(await count('update_workspace'), 1);
+await page.fill('#sTpl', ''); await page.fill('#sGoal', '80'); await page.fill('#sSectors', 'avukat, Diş Kliniği, mali müşavir'); await page.click('#sSave');
+await page.waitForFunction(() => document.getElementById('toast').textContent.includes('Ayarlar kaydedildi'));
+const us = (await last('update_workspace'))[1].p_patch; assert.deepEqual([us.weekly_goal, us.message_template, us.sector_suggestions], [80, '', ['avukat', 'Diş Kliniği', 'mali müşavir']]);
+assert.equal(await txt('#weekGoal'), '80'); assert.equal(await page.locator('#sectorChips .chip').count(), 3); ok('ayarlar: "iptal" cümlesiz şablon reddedilir; hedef, sektörler ve boş şablon kaydedilir');
+assert.match(await txt('#planName'), /Vitrin/); await page.click('#planPkgs'); await page.waitForSelector('#pkgDlg[open]');
+assert.match(await txt('#pkgDlg'), /500 TL[\s\S]*1\.000 TL[\s\S]*2\.000 TL/); assert.equal(await vis('#pkgNote'), false); await page.click('#pkgClose'); ok('paketler: üç fiyat görünür (demo dışı alanda kilit notu yok)');
+await page.click('#teamView summary.sum'); assert.match(await txt('#legalText'), /KVKK[\s\S]*30 gün[\s\S]*iptal/); assert.match(await raw('#teamView'), /hukukçu onayı bekliyor/); ok('notlarda aydınlatma metni taslağı');
 
-// =============================================================== GEÇMİŞ, ÇIKIŞ
+// =============================================================== RAPORLAR, ÇIKIŞ
 await page.click('[data-nav="hist"]'); await page.waitForSelector('#histList li');
-assert.match(await txt('#repTiles'), /7\s*Gönderilen/); assert.match(await txt('#repLine'), /Dönüş oranı 30%/); ok('rapor: haftalık sayılar ve dönüş oranı');
-assert.equal(await page.locator('#histList li').count(), 5); await shot('11-gecmis'); await axe('geçmiş'); ok('geçmiş listesi dolu');
+assert.match(await txt('#repTiles'), /12\s*ulaşılan işletme/); assert.match(await txt('#repTiles'), /4\s*olumlu/); assert.match(await txt('#repTiles'), /3\s*red/); assert.match(await txt('#repTiles'), /1\s*satış/);
+assert.match(await txt('#repTiles2'), /8\.500/); assert.match(await txt('#repReasons'), /Fiyat yüksek\s*2/);
+assert.equal(await page.locator('#repMonth option').count(), 12); assert.match((await last('monthly_report'))[1].p_month, /^\d{4}-\d{2}-01$/);
+await page.selectOption('#repMonth', { index: 1 }); await page.waitForFunction(() => window.__calls.filter(c => c[0] === 'monthly_report').length === 2);
+ok('aylık rapor: ulaşılan, olumlu, red, satış, tutar, red sebepleri; ay seçilebilir');
+assert.equal(await page.locator('#histList li').count(), 5); await page.waitForTimeout(300); await shot('12-raporlar'); await axe('raporlar');
+assert.match(await txt('#histList'), /Sebep: Fiyat yüksek/); ok('işlem geçmişi dolu, ret sebebi görünür');
 await page.fill('#histSearch', 'meşgul'); await page.waitForTimeout(500);
 assert.ok((await calls()).some(c => c[0] === 'search_history' && c[1].p_term === 'meşgul')); ok('geçmişte arama sunucuya gider');
+const hdr = await page.evaluate(() => {   // en kötü durum: 3 haneli sayaç ve uzun alan adı
+  document.getElementById('weekCount').textContent = '100'; document.getElementById('roleBadge').textContent = 'Uzun Bir Şirket Adı A.Ş.';
+  const r = id => document.getElementById(id).getBoundingClientRect();
+  return { badgeRight: Math.min(r('roleBadge').right, r('roleBadge').left + r('roleBadge').width), goalLeft: Math.min(r('goalBox').left, document.querySelector('.goal-top').getBoundingClientRect().left) };
+});
+assert.ok(hdr.badgeRight <= hdr.goalLeft + 0.5, `başlıkta rozet sayaçla çakışıyor: ${JSON.stringify(hdr)}`); ok('başlıkta rozet ile haftalık sayaç çakışmaz');
+{ const sw = await page.evaluate(() => document.documentElement.scrollWidth); assert.ok(sw <= VW, 'yatay taşma (uygulama): ' + sw); }
 await page.click('#logout'); await page.waitForSelector('#login:not(.hide)'); ok('çıkış giriş ekranına döner');
 await page.click('#email');
 const sw = await page.evaluate(() => document.documentElement.scrollWidth); assert.ok(sw <= VW, 'yatay taşma: ' + sw); ok(`${VW}px ekranda yatay taşma yok`);
 assert.deepEqual(errors, [], 'konsol hataları: ' + errors.join(' | ')); ok('konsol hatası yok (yönetici)');
 await ctx.close();
 
-// =============================================================== 2) ROL SENARYOLARI
-{ // tasarımcı: yalnızca müşteriler
+// =============================================================== 2) PİLOT (demo alan)
+{
+  const r = await mk({ role: 'admin', preLogged: true, ws: 'pilot' }); const p = r.page;
+  await p.goto('https://panel.test/'); await p.waitForSelector('#biz:not(.hide)');
+  assert.equal(await r.t.raw('#roleBadge'), 'Pilot Şirket'); assert.equal(await r.t.vis('#demoBar'), true); assert.equal(await r.t.vis('#intro'), false);
+  await r.t.shot('13-pilot'); await r.t.axe('pilot');
+  ok('pilot: başlıkta şirket adı, demo şeridi görünür');
+  await p.click('#waBtn'); const u = (await p.evaluate(() => window.__opened))[0];
+  assert.equal(u, 'https://web.whatsapp.com/send?phone=905321112233'); assert.match(await r.t.txt('#waHint'), /Sohbet boş açılır/); ok('şablon boşsa WhatsApp boş mesajla açılır');
+  await p.click('#demoPkgs'); await p.waitForSelector('#pkgDlg[open]'); assert.equal(await r.t.vis('#pkgNote'), true);
+  assert.match(await r.t.txt('#pkgNote'), /Demo sürümünde paket içerikleri görüntülenemez/); await r.t.shot('14-paketler'); await r.t.axe('paketler'); await p.click('#pkgClose');
+  ok('demo: paketler açılır, içerikler kilitli');
+  await p.click('[data-nav="scan"]'); await p.waitForSelector('#scQuota:not(.hide)');
+  assert.match(await r.t.txt('#scQuota'), /120 \/ 500[\s\S]*380 hak kaldı/); assert.equal(await p.locator('#sectorChips .chip').count(), 3); ok('pilot: Tara\'da aylık kota (120/500) ve alanın sektör önerileri');
+  await p.route('**/functions/v1/scan', route => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' },
+    body: JSON.stringify({ city: 'Ankara', usage: { used: 0, limit: 60 }, quota: { limit: 500, used: 500, left: 0 }, est_calls: 3, fits_today: 20, units: [{ district: '', sector: 'avukat', status: 'scan' }] }) }));
+  await p.fill('#scCity', 'Ankara'); await p.fill('#scSectors', 'avukat'); await p.click('#scPlan'); await p.waitForSelector('#scPlanWrap:not(.hide)');
+  assert.equal(await r.t.vis('#scRun'), false); assert.match(await r.t.txt('#scPlanBox'), /kotası doldu/); assert.match(await r.t.txt('#scQuota'), /Kota doldu/); ok('kota dolunca tarama başlatılamaz, açık uyarı');
+  await p.click('[data-nav="team"]'); await p.waitForSelector('.trow');
+  assert.equal(await r.t.vis('#wsAdminBox'), false); assert.equal(await p.locator('.trow').count(), 1); assert.match(await r.t.txt('#teamList'), /ali@pilot\.test/);
+  assert.equal(await p.locator('.trow select').count(), await p.locator('.trow').count()); assert.match(await r.t.txt('#planName'), /Demo sürüm/); assert.match(await r.t.txt('#planInfo'), /500/);
+  assert.ok(!(await r.t.calls()).some(c => c[0] === 'list_workspaces')); ok('pilot yöneticisi: yalnızca rol seçimi, Alanlar bölümü yok; paket = Demo');
+  const sw = await p.evaluate(() => document.documentElement.scrollWidth); assert.ok(sw <= VW, 'pilot yatay taşma: ' + sw);
+  assert.deepEqual(r.errors, []); await r.ctx.close();
+}
+
+// =============================================================== 3) ROL SENARYOLARI
+{ // operasyon: yalnızca müşteriler
   const r = await mk({ role: 'designer', preLogged: true }); const p = r.page;
   await p.goto('https://panel.test/'); await p.waitForSelector('#customersView:not(.hide)'); await p.waitForSelector('.cust');
-  assert.equal(await r.t.raw('#roleBadge'), 'Tasarımcı'); assert.equal(await r.t.vis('#tabs'), false); assert.equal(await r.t.vis('#goalBox'), false);
+  assert.equal(await r.t.raw('#roleBadge'), 'Operasyon'); assert.equal(await r.t.vis('#tabs'), false); assert.equal(await r.t.vis('#goalBox'), false);
   const names = (await r.t.calls()).map(c => c[0]);
-  for (const n of ['stats', 'list_counts', 'next_business', 'filter_options', 'team_list']) assert.ok(!names.includes(n), `tasarımcı ${n} çağırmamalı`);
-  await r.t.shot('12-tasarimci'); await r.t.axe('tasarımcı');
-  await p.click('.cust'); await p.waitForSelector('#cdlg[open]'); await p.click('#cStages .chip:text-is("Müşteri onayında")'); await p.click('#stageSave');
-  await p.waitForFunction(() => /→ Müşteri onayında/.test(document.querySelector('#cTimeline li')?.textContent || ''));
-  assert.equal(await r.t.vis('#custAdd'), true); ok('tasarımcı: yalnızca müşteriler; satış ekranları ve çağrıları yok; aşama değiştirebilir');
+  for (const n of ['stats', 'list_counts', 'next_business', 'filter_options', 'team_list', 'monthly_report']) assert.ok(!names.includes(n), `operasyon ${n} çağırmamalı`);
+  await r.t.shot('15-operasyon'); await r.t.axe('operasyon');
+  await p.click('.cust'); await p.waitForSelector('#cdlg[open]'); await p.click('#cStages .chip:text-is("Satış tamamlandı")'); await p.click('#stageSave');
+  await p.waitForFunction(() => /→ Satış tamamlandı/.test(document.querySelector('#cTimeline li')?.textContent || ''));
+  assert.equal(await r.t.vis('#saleForm'), true); assert.equal(await r.t.vis('#custAdd'), true); ok('operasyon: yalnızca müşteriler; satış ekranları ve çağrıları yok; aşama ve satış yönetir');
   assert.deepEqual(r.errors, []); await r.ctx.close();
 }
 { // satış: ekip yok
   const r = await mk({ role: 'sales', preLogged: true }); const p = r.page;
   await p.goto('https://panel.test/'); await p.waitForSelector('#biz:not(.hide)');
   assert.equal(await r.t.raw('#roleBadge'), 'Satış'); assert.equal(await p.locator('#tabs [data-nav]:not(.hide)').count(), 4); assert.equal(await p.locator('[data-nav="team"]').isVisible(), false);
-  ok('satış: ekip sekmesi gizli, diğer dört bölüm açık'); assert.deepEqual(r.errors, []); await r.ctx.close();
+  ok('satış: ekip sekmesi gizli, diğer dört bölüm (raporlar dahil) açık'); assert.deepEqual(r.errors, []); await r.ctx.close();
 }
 { // rolsüz
   const r = await mk({ role: 'none', preLogged: true }); const p = r.page;
   await p.goto('https://panel.test/'); await p.waitForSelector('#gate:not(.hide)');
-  assert.match(await r.t.txt('#gateTitle'), /henüz yetki verilmedi/); assert.equal(await r.t.vis('#app'), false); await r.t.shot('13-yetkisiz'); await r.t.axe('yetkisiz');
-  assert.ok(!(await r.t.calls()).some(c => ['next_business', 'v_customers'].includes(c[0]))); ok('rolsüz kullanıcı yalnızca bilgi ekranını görür, veri çağrısı yapılmaz'); assert.deepEqual(r.errors, []); await r.ctx.close();
+  assert.match(await r.t.txt('#gateTitle'), /henüz yetki verilmedi/); assert.equal(await r.t.vis('#app'), false); await r.t.shot('16-yetkisiz'); await r.t.axe('yetkisiz');
+  assert.ok(!(await r.t.calls()).some(c => ['next_business', 'from:v_customers'].includes(c[0]))); ok('rolsüz kullanıcı yalnızca bilgi ekranını görür, veri çağrısı yapılmaz'); assert.deepEqual(r.errors, []); await r.ctx.close();
 }
 { // güncellenmemiş veritabanı
   const r = await mk({ role: 'admin', preLogged: true, accessError: true }); const p = r.page;
