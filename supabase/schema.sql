@@ -115,6 +115,7 @@ create table if not exists public.scan_history (
   api_calls    int not null default 0
 );
 alter table public.scan_history add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
+alter table public.scan_history add column if not exists user_id uuid;   -- taramayı kim yaptı (yönetim paneli)
 
 -- ---------- Roller ----------
 -- Kullanıcıyı Supabase > Authentication > Users'tan siz eklersiniz; alanını ve rolünü panelde "Ekip" sekmesinden verirsiniz.
@@ -412,6 +413,7 @@ drop function if exists public.monthly_report(date);
 drop function if exists public.list_workspaces();
 drop function if exists public.create_workspace(text,boolean,int);
 drop function if exists public.update_workspace(uuid,jsonb);
+drop function if exists public.admin_usage(date);
 
 create or replace function public.next_business(p_list text, p_city text default null,
                                                 p_sector text default null, p_skip uuid[] default '{}')
@@ -641,16 +643,20 @@ language sql stable security definer set search_path = public as $$
 $$;
 
 -- Platform yöneticisi herkesi (alanı olmayanlar dahil) görür; alan yöneticisi yalnızca kendi alanını
+-- Kayıt formunda girilen bilgiler (ad, şirket, telefon) kullanıcıya aittir: yalnızca gösterim için, platform yöneticisine
 create or replace function public.team_list()
 returns table (user_id uuid, email text, display_name text, role text, workspace_id uuid, workspace_name text,
-               last_sign_in_at timestamptz, created_at timestamptz)
+               last_sign_in_at timestamptz, created_at timestamptz, full_name text, company text, phone text)
 language plpgsql stable security definer set search_path = public as $$
 declare plat boolean := public.is_platform_admin(); ws uuid := public.my_ws();
 begin
   if not public.has_perm('team') then raise exception 'Bu işlem için yetkiniz yok'; end if;
   return query
     select u.id, u.email::text, r.display_name, coalesce(r.role, 'none'), r.workspace_id, w.name,
-           u.last_sign_in_at, u.created_at
+           u.last_sign_in_at, u.created_at,
+           left(nullif(btrim(u.raw_user_meta_data->>'full_name'), ''), 80),
+           case when plat then left(nullif(btrim(u.raw_user_meta_data->>'company'), ''), 80) end,
+           case when plat then left(nullif(btrim(u.raw_user_meta_data->>'phone'), ''), 30) end
       from auth.users u
       left join public.user_roles r on r.user_id = u.id
       left join public.workspaces w on w.id = r.workspace_id
@@ -935,6 +941,65 @@ begin
   return res;
 end $$;
 
+-- ---------- Yönetim paneli (yalnızca platform yöneticisi): kim, ne kadar kullandı ----------
+-- Google çağrısı başına tahmini maliyet (USD, Text Search Enterprise). Fiyat değişirse burayı güncelleyin.
+create or replace function public.google_cost_per_call() returns numeric language sql immutable as $$ select 0.035::numeric $$;
+
+create or replace function public.admin_usage(p_month date default null)
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare m0 timestamptz; m1 timestamptz; d date := coalesce(p_month, (now() at time zone 'Europe/Istanbul')::date); res jsonb;
+begin
+  if not public.is_platform_admin() then raise exception 'Bu işlem için yetkiniz yok'; end if;
+  m0 := date_trunc('month', d::timestamp) at time zone 'Europe/Istanbul';
+  m1 := (date_trunc('month', d::timestamp) + interval '1 month') at time zone 'Europe/Istanbul';
+  with sh as (select * from public.scan_history where scanned_at >= m0 and scanned_at < m1),
+       c  as (select * from public.calls where called_at >= m0 and called_at < m1),
+       s  as (select * from public.customer_sales where sold_at >= m0 and sold_at < m1)
+  select jsonb_build_object(
+    'month', to_char(m0 at time zone 'Europe/Istanbul', 'YYYY-MM'),
+    'cost_per_call', public.google_cost_per_call(),
+    'totals', jsonb_build_object(
+      'api_calls',    (select coalesce(sum(api_calls), 0) from sh),
+      'scans',        (select count(*) from sh),
+      'leads',        (select coalesce(sum(saved), 0) from sh),
+      'actions',      (select count(*) from c),
+      'wa_sent',      (select count(*) from c where outcome = 'wa_sent'),
+      'won',          (select count(*) from c where outcome = 'won'),
+      'sales_total',  (select coalesce(sum(amount), 0) from s),
+      'active_users', (select count(distinct x.uid) from (select user_id as uid from c union all select user_id from sh) x where x.uid is not null),
+      'users',        (select count(*) from auth.users),
+      'pending',      (select count(*) from auth.users u where not exists (select 1 from public.user_roles r where r.user_id = u.id))),
+    'workspaces', coalesce((select jsonb_agg(to_jsonb(x) order by x.api_calls desc, x.actions desc, x.name) from (
+        select w.id, w.name, w.is_platform, w.is_demo, w.lead_quota,
+               (select count(*) from public.user_roles r where r.workspace_id = w.id) as members,
+               (select coalesce(sum(api_calls), 0) from sh where sh.workspace_id = w.id) as api_calls,
+               (select count(*) from sh where sh.workspace_id = w.id) as scans,
+               (select coalesce(sum(saved), 0) from sh where sh.workspace_id = w.id) as leads,
+               (select count(*) from c where c.workspace_id = w.id) as actions,
+               (select count(*) from c where c.workspace_id = w.id and c.outcome in ('interested','callback','won')) as positive,
+               (select count(*) from c where c.workspace_id = w.id and c.outcome = 'won') as won,
+               (select coalesce(sum(amount), 0) from s where s.workspace_id = w.id) as sales_total,
+               greatest((select max(scanned_at) from public.scan_history h where h.workspace_id = w.id),
+                        (select max(called_at) from public.calls k where k.workspace_id = w.id)) as last_activity
+          from public.workspaces w) x), '[]'),
+    'users', coalesce((select jsonb_agg(to_jsonb(x) order by x.actions desc, x.api_calls desc, x.created_at desc) from (
+        select u.id, u.email::text as email,
+               coalesce(r.display_name, left(nullif(btrim(u.raw_user_meta_data->>'full_name'), ''), 80)) as name,
+               left(nullif(btrim(u.raw_user_meta_data->>'company'), ''), 80) as company,
+               w.name as workspace, coalesce(r.role, 'none') as role, u.created_at, u.last_sign_in_at,
+               (select count(*) from c where c.user_id = u.id) as actions,
+               (select count(*) from sh where sh.user_id = u.id) as scans,
+               (select coalesce(sum(api_calls), 0) from sh where sh.user_id = u.id) as api_calls,
+               (select coalesce(sum(saved), 0) from sh where sh.user_id = u.id) as leads,
+               greatest((select max(called_at) from public.calls k where k.user_id = u.id),
+                        (select max(scanned_at) from public.scan_history h where h.user_id = u.id)) as last_activity
+          from auth.users u
+          left join public.user_roles r on r.user_id = u.id
+          left join public.workspaces w on w.id = r.workspace_id) x), '[]')
+  ) into res;
+  return res;
+end $$;
+
 -- Fonksiyon yetkileri: anon hiçbirini çağıramaz
 revoke all on function public.next_business(text,text,text,uuid[]), public.release_business(uuid),
   public.move_to_call_list(uuid), public.log_call(uuid,text,text,timestamptz,text), public.list_counts(text,text),
@@ -944,6 +1009,7 @@ revoke all on function public.next_business(text,text,text,uuid[]), public.relea
   public.set_customer_stage(uuid,text,text), public.add_customer_note(uuid,text), public.customer_timeline(uuid),
   public.add_sale(uuid,text,int,numeric), public.delete_sale(uuid), public.scan_context(uuid), public.purge_stale_leads(),
   public.monthly_report(date), public.list_workspaces(), public.create_workspace(text,boolean,int), public.update_workspace(uuid,jsonb),
+  public.admin_usage(date), public.google_cost_per_call(),
   public.has_perm(text), public.role_perms(text), public.stage_label(text), public.reason_label(text), public.my_ws(),
   public.is_platform_admin(), public.platform_ws(), public.ws_leads_this_month(uuid), public.tr_month_start(timestamptz)
   from public, anon, authenticated;
@@ -955,7 +1021,7 @@ grant execute on function public.next_business(text,text,text,uuid[]), public.re
   public.set_customer_stage(uuid,text,text), public.add_customer_note(uuid,text), public.customer_timeline(uuid),
   public.add_sale(uuid,text,int,numeric), public.delete_sale(uuid), public.monthly_report(date),
   public.list_workspaces(), public.create_workspace(text,boolean,int), public.update_workspace(uuid,jsonb),
-  public.stage_label(text), public.reason_label(text), public.tr_month_start(timestamptz) to authenticated;
+  public.admin_usage(date), public.stage_label(text), public.reason_label(text), public.tr_month_start(timestamptz) to authenticated;
 -- Politikalar ve görünümler bu fonksiyonları çağırdığı için giriş yapmış kullanıcıda çalışabilmeli
 grant execute on function public.has_perm(text), public.role_perms(text), public.my_ws(), public.is_platform_admin() to authenticated;
 grant execute on function public.ingest_businesses(uuid,jsonb), public.scan_context(uuid), public.purge_stale_leads() to service_role;

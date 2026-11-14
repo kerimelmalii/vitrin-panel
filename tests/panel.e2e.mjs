@@ -68,6 +68,17 @@ const { txt, raw, calls, count, last, vis, shot, axe } = t;
 
 await page.goto('https://panel.test/');
 await page.waitForSelector('#login:not(.hide)'); await shot('01-giris'); await axe('giriş'); ok('giriş ekranı açıldı');
+await page.click('#toSignup'); assert.equal(await vis('#signupForm'), true); assert.equal(await vis('#loginForm'), false);
+await page.fill('#suName', 'Deniz Kaya'); await page.click('#suBtn'); await page.waitForFunction(() => /Şirket adını/.test(document.getElementById('suMsg').textContent));
+await page.fill('#suCompany', 'Kaya Hukuk'); await page.fill('#suEmail', 'deniz@kaya.test'); await page.fill('#suPassword', 'kisa'); await page.click('#suBtn');
+await page.waitForFunction(() => /en az 8/.test(document.getElementById('suMsg').textContent));
+await page.fill('#suEmail', 'var@kaya.test'); await page.fill('#suPassword', 'uzun-sifre-1'); await page.click('#suBtn');
+await page.waitForFunction(() => /zaten kayıtlı/.test(document.getElementById('suMsg').textContent));
+await page.fill('#suEmail', 'deniz@kaya.test'); await page.fill('#suPhone', '0532 000 00 00'); await page.fill('#suPassword', 'uzun-sifre-1'); await page.click('#suBtn');
+await page.waitForFunction(() => /Kaydınız alındı/.test(document.getElementById('suMsg').textContent));
+assert.deepEqual(await page.evaluate(() => window.__signups.at(-1)), { email: 'deniz@kaya.test', data: { full_name: 'Deniz Kaya', company: 'Kaya Hukuk', phone: '0532 000 00 00' } });
+await shot('01b-kayit'); await axe('kayıt');
+await page.click('#toLogin'); assert.equal(await vis('#loginForm'), true); ok('kayıt ol: doğrulama, var olan e-posta uyarısı, başarılı kayıtta e-posta doğrulama mesajı');
 await page.fill('#email', 'a@b.com'); await page.fill('#password', 'yanlis'); await page.click('#loginForm button');
 await page.waitForFunction(() => document.getElementById('loginErr').textContent.length > 0); ok('yanlış şifre hata gösterir');
 await page.fill('#password', 'dogru'); await page.click('#loginForm button');
@@ -83,7 +94,7 @@ await page.click('#helpBtn'); assert.equal(await vis('#intro'), true); await pag
 ok('ilk giriş tanıtımı: dört adım, "Anladım" ile kapanır, hatırlanır, ? ile yeniden açılır');
 
 assert.equal(await raw('#roleBadge'), 'Yönetici'); assert.equal(await vis('#demoBar'), false);
-assert.equal(await page.locator('#tabs [data-nav]:not(.hide)').count(), 5); ok('platform yöneticisi beş bölümü görür, demo şeridi yok');
+assert.equal(await page.locator('#tabs [data-nav]:not(.hide)').count(), 6); ok('platform yöneticisi altı bölümü (Yönetim dahil) görür, demo şeridi yok');
 assert.equal(await txt('#n_customers'), '1'); ok('müşteriler rozeti devam eden müşteri sayısını gösterir (sayım sorgusuyla)');
 
 await page.waitForTimeout(700); await shot('03-whatsapp'); await axe('whatsapp kartı');
@@ -257,8 +268,9 @@ scanMode = 'ok';
 // =============================================================== EKİP, AYARLAR, ALANLAR
 await page.click('[data-nav="team"]'); await page.waitForSelector('.trow');
 assert.equal(await page.locator('.trow').count(), 4); assert.match(await txt('#teamList'), /Kerim \(siz\)/);
-assert.equal(await vis('#wsAdminBox'), true); assert.equal(await page.locator('.trow:nth-child(1) select').count(), 2);
-await shot('11-ekip'); await axe('ekip'); ok('platform yöneticisi: herkes listelenir, alan seçimi ve Alanlar bölümü görünür');
+assert.equal(await vis('#wsAdminBox'), false); assert.equal(await page.locator('.trow:nth-child(1) select').count(), 2);
+assert.match(await txt('.trow:nth-child(3)'), /Kayıt: Deniz Kaya · Kaya Hukuk · 0532 000 00 00/); assert.equal(await page.inputValue('.trow:nth-child(3) input'), 'Deniz Kaya');
+await shot('11-ekip'); await axe('ekip'); ok('platform yöneticisi: herkes listelenir, alan seçimi var; kayıt olanın ad/şirket/telefonu görünür');
 await page.selectOption('.trow:nth-child(3) select >> nth=0', 'w1'); await page.selectOption('.trow:nth-child(3) select >> nth=1', 'admin');
 await page.fill('.trow:nth-child(3) input', 'Ayşe'); await page.click('.trow:nth-child(3) button');
 await page.waitForFunction(() => document.getElementById('toast').textContent.includes('Yetki güncellendi'));
@@ -267,18 +279,10 @@ await page.waitForSelector('.trow'); await page.selectOption('.trow:nth-child(2)
 assert.match(await txt('#dlgText'), /arkadas@vitrin\.test/); assert.equal(await count('set_user_role'), 1);
 await page.click('#dlgOk'); await page.waitForFunction(() => window.__calls.filter(c => c[0] === 'set_user_role').length === 2);
 assert.equal((await last('set_user_role'))[1].p_role, 'none'); ok('yetki kaldırma onay ister');
-// alanlar
-assert.equal(await page.locator('#wsList .wsrow').count(), 2); assert.match(await txt('#wsList'), /Pilot Şirket[\s\S]*120\/500 işletme[\s\S]*Demo/);
-await page.fill('#wsList .wsrow:nth-child(2) input[type="number"]', '750'); await page.click('#wsList .wsrow:nth-child(2) button');
-await page.waitForFunction(() => document.getElementById('toast').textContent.includes('Alan güncellendi'));
-assert.deepEqual((await last('update_workspace'))[1], { p_ws: 'w1', p_patch: { is_demo: true, lead_quota: '750' } }); ok('platform yöneticisi alanın kotasını ve demo durumunu değiştirir');
-await page.fill('#nwName', 'Yeni Şirket'); await page.fill('#nwQuota', '250'); await page.click('#nwCreate');
-await page.waitForFunction(() => document.querySelectorAll('#wsList .wsrow').length === 3);
-assert.deepEqual((await last('create_workspace'))[1], { p_name: 'Yeni Şirket', p_is_demo: true, p_quota: 250 }); ok('yeni alan (şirket) açılır');
 // ayarlar
 assert.equal(await page.inputValue('#sGoal'), '100'); assert.match(await page.inputValue('#sTpl'), /iptal/);
 await page.fill('#sTpl', 'Merhaba {isim}'); await page.click('#sSave');
-await page.waitForFunction(() => document.getElementById('toast').textContent.includes('"iptal"')); assert.equal(await count('update_workspace'), 1);
+await page.waitForFunction(() => document.getElementById('toast').textContent.includes('"iptal"')); assert.equal(await count('update_workspace'), 0);
 await page.fill('#sTpl', ''); await page.fill('#sGoal', '80'); await page.fill('#sSectors', 'avukat, Diş Kliniği, mali müşavir'); await page.click('#sSave');
 await page.waitForFunction(() => document.getElementById('toast').textContent.includes('Ayarlar kaydedildi'));
 const us = (await last('update_workspace'))[1].p_patch; assert.deepEqual([us.weekly_goal, us.message_template, us.sector_suggestions], [80, '', ['avukat', 'Diş Kliniği', 'mali müşavir']]);
@@ -286,6 +290,28 @@ assert.equal(await txt('#weekGoal'), '80'); assert.equal(await page.locator('#se
 assert.match(await txt('#planName'), /Vitrin/); await page.click('#planPkgs'); await page.waitForSelector('#pkgDlg[open]');
 assert.match(await txt('#pkgDlg'), /500 TL[\s\S]*1\.000 TL[\s\S]*2\.000 TL/); assert.equal(await vis('#pkgNote'), false); await page.click('#pkgClose'); ok('paketler: üç fiyat görünür (demo dışı alanda kilit notu yok)');
 await page.click('#teamView summary.sum'); assert.match(await txt('#legalText'), /KVKK[\s\S]*30 gün[\s\S]*iptal/); assert.match(await raw('#teamView'), /hukukçu onayı bekliyor/); ok('notlarda aydınlatma metni taslağı');
+
+// =============================================================== YÖNETİM (yalnızca platform yöneticisi)
+assert.equal(await txt('#n_admin'), '1');
+await page.click('[data-nav="admin"]'); await page.waitForSelector('#adminView:not(.hide)'); await page.waitForSelector('#admUsers .adm-row');
+assert.match(await txt('#admPending'), /1 kişi onay bekliyor/);
+assert.match(await txt('#admTiles'), /42\s*Google çağrısı/); assert.match(await txt('#admTiles'), /\$1,47|1,47\s*\$/); assert.match(await txt('#admTiles'), /62\s*bulunan işletme/);
+assert.match(await txt('#admTiles2'), /2\s*aktif kullanıcı/); assert.match(await txt('#admCostNote'), /token harcaması yoktur/);
+assert.equal(await page.locator('#admWs .adm-row').count(), 2); assert.match(await txt('#admWs'), /Pilot Şirket · Demo[\s\S]*120\/500 işletme/);
+assert.equal(await page.locator('#admUsers .adm-row').count(), 4); assert.match(await txt('#admUsers'), /arkadas@vitrin\.test[\s\S]*Onay bekliyor/);
+assert.match(await txt('#admUsers'), /Ayşe|Deniz Kaya/); assert.match(await txt('#admUsers .adm-row:first-child'), /30\s*Google çağrısı/);
+await shot('12-yonetim'); await axe('yönetim');
+ok('yönetim: Google çağrısı, tahmini maliyet, işletme, işlem; şirket ve kişi bazında kullanım; onay bekleyenler');
+await page.selectOption('#admMonth', { index: 1 }); await page.waitForFunction(() => window.__calls.filter(c => c[0] === 'admin_usage').length >= 3);
+assert.match((await last('admin_usage'))[1].p_month, /^\d{4}-\d{2}-01$/); ok('yönetim: ay seçilebilir');
+assert.equal(await page.locator('#wsList .wsrow').count(), 2); assert.match(await txt('#wsList'), /Pilot Şirket[\s\S]*120\/500 işletme[\s\S]*Demo/);
+await page.fill('#wsList .wsrow:nth-child(2) input[type="number"]', '750'); await page.click('#wsList .wsrow:nth-child(2) button');
+await page.waitForFunction(() => document.getElementById('toast').textContent.includes('Alan güncellendi'));
+assert.deepEqual((await last('update_workspace'))[1], { p_ws: 'w1', p_patch: { is_demo: true, lead_quota: '750' } }); ok('platform yöneticisi alanın kotasını ve demo durumunu değiştirir');
+await page.fill('#nwName', 'Yeni Şirket'); await page.fill('#nwQuota', '250'); await page.click('#nwCreate');
+await page.waitForFunction(() => document.querySelectorAll('#wsList .wsrow').length === 3);
+assert.deepEqual((await last('create_workspace'))[1], { p_name: 'Yeni Şirket', p_is_demo: true, p_quota: 250 }); ok('yeni alan (şirket) açılır');
+await page.click('#admToTeam'); await page.waitForSelector('#teamView:not(.hide)'); ok('"Ekip\'te onayla" ekip listesine götürür');
 
 // =============================================================== RAPORLAR, ÇIKIŞ
 await page.click('[data-nav="hist"]'); await page.waitForSelector('#histList li');
@@ -330,7 +356,8 @@ await ctx.close();
   await p.fill('#scCity', 'Ankara'); await p.fill('#scSectors', 'avukat'); await p.click('#scPlan'); await p.waitForSelector('#scPlanWrap:not(.hide)');
   assert.equal(await r.t.vis('#scRun'), false); assert.match(await r.t.txt('#scPlanBox'), /kotası doldu/); assert.match(await r.t.txt('#scQuota'), /Kota doldu/); ok('kota dolunca tarama başlatılamaz, açık uyarı');
   await p.click('[data-nav="team"]'); await p.waitForSelector('.trow');
-  assert.equal(await r.t.vis('#wsAdminBox'), false); assert.equal(await p.locator('.trow').count(), 1); assert.match(await r.t.txt('#teamList'), /ali@pilot\.test/);
+  assert.equal(await p.locator('[data-nav="admin"]').isVisible(), false); assert.ok(!(await r.t.calls()).some(c => c[0] === 'admin_usage'));
+  assert.equal(await p.locator('.trow').count(), 1); assert.doesNotMatch(await r.t.txt('#teamList'), /Kayıt:/); assert.match(await r.t.txt('#teamList'), /ali@pilot\.test/);
   assert.equal(await p.locator('.trow select').count(), await p.locator('.trow').count()); assert.match(await r.t.txt('#planName'), /Demo sürüm/); assert.match(await r.t.txt('#planInfo'), /500/);
   assert.ok(!(await r.t.calls()).some(c => c[0] === 'list_workspaces')); ok('pilot yöneticisi: yalnızca rol seçimi, Alanlar bölümü yok; paket = Demo');
   const sw = await p.evaluate(() => document.documentElement.scrollWidth); assert.ok(sw <= VW, 'pilot yatay taşma: ' + sw);
@@ -359,7 +386,7 @@ await ctx.close();
 { // rolsüz
   const r = await mk({ role: 'none', preLogged: true }); const p = r.page;
   await p.goto('https://panel.test/'); await p.waitForSelector('#gate:not(.hide)');
-  assert.match(await r.t.txt('#gateTitle'), /henüz yetki verilmedi/); assert.equal(await r.t.vis('#app'), false); await r.t.shot('16-yetkisiz'); await r.t.axe('yetkisiz');
+  assert.match(await r.t.txt('#gateTitle'), /onay bekliyor/); assert.match(await r.t.txt('#gateText'), /henüz yetki verilmedi/); assert.equal(await r.t.vis('#app'), false); await r.t.shot('16-yetkisiz'); await r.t.axe('yetkisiz');
   assert.ok(!(await r.t.calls()).some(c => ['next_business', 'from:v_customers'].includes(c[0]))); ok('rolsüz kullanıcı yalnızca bilgi ekranını görür, veri çağrısı yapılmaz'); assert.deepEqual(r.errors, []); await r.ctx.close();
 }
 { // güncellenmemiş veritabanı

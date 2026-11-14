@@ -334,6 +334,32 @@ select pg_temp.assert((select leads_this_month from public.my_access()) = 3, 'ko
 set request.jwt.claim.sub = '66666666-6666-6666-6666-666666666666';
 select pg_temp.assert((public.monthly_report()->>'actions')::int = 0 and (public.monthly_report()->>'sales_total')::numeric = 0, 'pilot raporu yalnızca kendi verisi');
 
+-- ===================== Kayıt bilgileri ve yönetim paneli =====================
+reset role;
+update auth.users set raw_user_meta_data = '{"full_name":"Deniz Kaya","company":"Kaya Hukuk","phone":"0532 000 00 00"}' where id = '44444444-4444-4444-4444-444444444444';
+update public.scan_history set user_id = '11111111-1111-1111-1111-111111111111' where workspace_id = public.platform_ws();
+set role authenticated;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+select pg_temp.assert((select full_name || '|' || company || '|' || phone from public.team_list() where user_id = '44444444-4444-4444-4444-444444444444') = 'Deniz Kaya|Kaya Hukuk|0532 000 00 00', 'kayıt bilgileri platform yöneticisine görünür');
+select pg_temp.assert((public.admin_usage()->'totals'->>'api_calls')::int = 2 and (public.admin_usage()->'totals'->>'leads')::int = 3, 'yönetim: Google çağrısı ve bulunan işletme');
+select pg_temp.assert((public.admin_usage()->'totals'->>'pending')::int = 1, 'yönetim: onay bekleyen 1 kişi');
+select pg_temp.assert((public.admin_usage()->'totals'->>'users')::int = 6, 'yönetim: toplam kullanıcı');
+select pg_temp.assert((select (x->>'api_calls')::int from jsonb_array_elements(public.admin_usage()->'users') x where x->>'email' = 'a@vitrin.test') = 2, 'yönetim: kişi bazında Google çağrısı');
+select pg_temp.assert((select x->>'name' from jsonb_array_elements(public.admin_usage()->'users') x where x->>'email' = 'd@vitrin.test') = 'Deniz Kaya'
+  and (select x->>'company' from jsonb_array_elements(public.admin_usage()->'users') x where x->>'email' = 'd@vitrin.test') = 'Kaya Hukuk', 'yönetim: onay bekleyenin adı ve şirketi');
+select pg_temp.assert(jsonb_array_length(public.admin_usage()->'workspaces') = 3, 'yönetim: her alan listelenir');
+select pg_temp.assert((select (x->>'actions')::int from jsonb_array_elements(public.admin_usage()->'workspaces') x where x->>'name' = 'Vitrin') >= 5, 'yönetim: alan bazında işlem');
+select pg_temp.assert((public.admin_usage((now() - interval '2 months')::date)->'totals'->>'api_calls')::int = 0, 'yönetim: geçmiş ay boş');
+set request.jwt.claim.sub = '55555555-5555-5555-5555-555555555555';   -- pilot yöneticisi
+select pg_temp.assert((select company from public.team_list() limit 1) is null, 'şirket/telefon bilgisi alan yöneticisine gösterilmez');
+do $$ begin
+  begin perform public.admin_usage(); raise exception 'pilot yönetim panelini gördü'; exception when raise_exception then if sqlerrm like 'pilot%' then raise; end if; end;
+end $$;
+set request.jwt.claim.sub = '22222222-2222-2222-2222-222222222222';
+do $$ begin
+  begin perform public.admin_usage(); raise exception 'satış yönetim panelini gördü'; exception when raise_exception then if sqlerrm like 'satış%' then raise; end if; end;
+end $$;
+
 -- Eski veri: durumu 'won' olup müşterisi olmayan işletme şema yeniden çalışınca müşteri olur
 reset role;
 update public.businesses set status = 'won' where name = 'Üçüncü';
