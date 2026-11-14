@@ -18,7 +18,7 @@ Birden fazla şirket (çalışma alanı) aynı paneli kullanır; her şirket yal
    (tasarım/yayında → Satış tamamlandı, beklemede → Anlaşma aşamasında, iptal → İletişimde), eski "tutar" alanı satış kalemine taşınır.
 2. **Supabase > Edge Functions > scan:** `supabase/functions/scan/index.ts` dosyasının yeni halini yapıştırıp Deploy.
 3. Dalı birleştirin; Vercel yeni paneli yayınlar.
-4. **Pilot şirketi açın:** panelde **Ekip > Alanlar** bölümünde şirket adını yazın, "Demo sürüm" işaretli ve kota 500 olarak **Alanı oluştur**.
+4. **Pilot şirketi açın:** panelde **Yönetim > Alanlar** bölümünde şirket adını yazın, "Demo sürüm" işaretli ve kota 500 olarak **Alanı oluştur**.
 5. **Pilot kullanıcıları:** Supabase > Authentication > Users > Add user ile ekleyin. Kişi bir kez giriş yaptıktan sonra
    **Ekip** listesinde görünür; alanını (pilot şirket) ve rolünü seçip Kaydet. Pilot şirketin en az bir **Yönetici**si olsun:
    o kişi kendi ekibinin rollerini, mesaj şablonunu ve sektör önerilerini kendisi yönetir.
@@ -26,6 +26,24 @@ Birden fazla şirket (çalışma alanı) aynı paneli kullanır; her şirket yal
    30 gün kuralı her gece otomatik işler. Açmasanız da olur: kural her taramada ayrıca çalışır ve eski kayıtlar listede zaten görünmez.
 
 Panel "Veritabanı güncellemesi gerekli" derse 1. adım yapılmamıştır.
+
+## Kayıt ol ve onay
+
+Giriş ekranında **Kayıt ol** vardır (ad, şirket, telefon, e-posta, şifre). Kayıt olan kişi hiçbir veri göremez;
+"Hesabınız onay bekliyor" ekranını görür. Platform yöneticisi **Yönetim** sekmesinde onay bekleyenleri görür,
+**Ekip**'te kişinin kayıtta yazdığı ad/şirket/telefonla birlikte alanını ve rolünü seçerek onaylar.
+
+Supabase'de bir kez:
+1. Authentication > Sign In / Providers > **Allow new users to sign up** açık olmalı. **Confirm email** açık kalsın (sahte adreslerle kayıt engellenir).
+2. Authentication > URL Configuration > **Site URL** = `https://panel.vitrinweb.com.tr` (doğrulama e-postasındaki bağlantı buraya döner).
+3. Supabase'in yerleşik e-posta servisi saatte birkaç e-postayla sınırlıdır; kayıt artarsa Authentication > SMTP Settings'ten kendi e-posta servisinizi bağlayın.
+
+## Yönetim (yalnızca Vitrin yöneticileri)
+
+**Yönetim** sekmesi yalnızca platform (Vitrin) yöneticilerine görünür; müşteri şirketler göremez. Seçilen ay için:
+Google çağrısı ve tahmini maliyeti (çağrı başına ~0,035 $, `google_cost_per_call()` fonksiyonundan değiştirilir), bulunan işletme,
+işlem, tarama, aktif/toplam kullanıcı, kayıtlı satış; **şirket bazında** ve **kişi bazında** kullanım; onay bekleyenler.
+Alan (şirket) açma, kota ve demo ayarı da buradadır. Panelde yapay zekâ olmadığı için token harcaması yoktur.
 
 ## Çalışma alanları (şirketler)
 
@@ -64,7 +82,7 @@ Telefonda alt gezinme çubuğu, bilgisayarda üst menü. İlk girişte altta kı
 * **Raporlar:** ay seçilir; ulaşılan işletme, olumlu, red, satış, ulaşılamayan, WhatsApp, satış tutarı, bulunan işletme,
   red sebepleri, sektör/kişi/ürün dağılımı. Altında aranabilir işlem geçmişi.
 * **Ekip:** roller; **Ayarlar** (şirket adı, haftalık hedef, günlük WhatsApp sınırı, sektör önerileri, WhatsApp şablonu);
-  platform yöneticisine **Alanlar**; **Paket**; **Notlar** (aydınlatma metni taslağı).
+  **Paket**; **Notlar** (aydınlatma metni taslağı).
 * **WhatsApp şablonu** alan ayarıdır; `{isim}` işletme adıyla değişir. Boşsa sohbet boş açılır. Şablon yazılırsa içinde "iptal"
   yazarak vazgeçme cümlesi bulunması zorunludur (sunucu da denetler).
 

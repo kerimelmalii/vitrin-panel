@@ -282,7 +282,12 @@
   .tagline{font-size:16px;color:var(--mute);margin:10px 0 0;font-weight:600;letter-spacing:-.01em}
   #login .sub,#gate .sub{color:var(--mute);margin:8px 0 24px;font-size:14.5px}
   #gate h1{font-size:22px;font-weight:800;letter-spacing:-.03em;margin-top:22px}
-  #login form{text-align:left;margin-top:26px} #loginErr{min-height:20px;margin-top:12px;font-size:14px;text-align:center}
+  #login form{text-align:left;margin-top:26px} #loginErr,#suMsg{min-height:20px;margin-top:12px;font-size:14px;text-align:center}
+  .switch{margin-top:6px;font-size:14px;color:var(--mute);text-align:center} .switch .link{font-size:14px}
+  .adm-row{display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding:13px 2px;border-bottom:1px solid var(--line)} .adm-row:last-child{border-bottom:0}
+  .adm-row .t{font-weight:800;overflow-wrap:anywhere} .adm-row .s{font-size:13px;color:var(--mute)} .adm-row .r{text-align:right;font-size:13px;color:var(--mute);white-space:nowrap}
+  .adm-row .r b{display:block;font-size:16px;color:var(--ink)}
+  .callout{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:14px 16px;border-radius:12px;background:var(--warn-bg);color:var(--warn);font-weight:700;font-size:14px;margin-bottom:12px}
 
   /* ---------- diyalog, bildirim, tanıtım ---------- */
   dialog{border:1px solid var(--line);border-radius:16px;padding:26px;max-width:min(92vw,400px);background:var(--bg);color:var(--ink);box-shadow:0 24px 60px rgba(17,17,20,.22)}
@@ -332,6 +337,23 @@
       <div class="space"></div>
       <button class="btn primary block">Giriş yap</button>
       <p id="loginErr" class="bad" role="alert"></p>
+      <p class="switch">Hesabın yok mu? <button type="button" class="link" id="toSignup">Kayıt ol</button></p>
+    </form>
+    <form id="signupForm" class="hide" novalidate>
+      <label for="suName">Ad soyad</label><input id="suName" autocomplete="name" required maxlength="80">
+      <div class="space"></div>
+      <label for="suCompany">Şirket</label><input id="suCompany" autocomplete="organization" required maxlength="80">
+      <div class="space"></div>
+      <label for="suPhone">Telefon <span class="muted" style="font-weight:500">(isteğe bağlı)</span></label><input id="suPhone" type="tel" autocomplete="tel" inputmode="tel" maxlength="30">
+      <div class="space"></div>
+      <label for="suEmail">E-posta</label><input id="suEmail" type="email" autocomplete="email" required>
+      <div class="space"></div>
+      <label for="suPassword">Şifre <span class="muted" style="font-weight:500">(en az 8 karakter)</span></label><input id="suPassword" type="password" autocomplete="new-password" required minlength="8">
+      <div class="space"></div>
+      <button class="btn primary block" id="suBtn">Kayıt ol</button>
+      <p id="suMsg" role="alert"></p>
+      <p class="hint" style="text-align:center">Kaydınız Vitrin tarafından onaylanınca şirketinizin alanına erişebilirsiniz.</p>
+      <p class="switch">Hesabın var mı? <button type="button" class="link" id="toLogin">Giriş yap</button></p>
     </form>
   </div>
 
@@ -368,6 +390,7 @@
       <button data-nav="scan"><span class="ico"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/><path d="M11 8v6M8 11h6"/></svg></span>Tara</button>
       <button data-nav="hist"><span class="ico"><svg class="i" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg></span>Raporlar</button>
       <button data-nav="team"><span class="ico"><svg class="i" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>Ekip</button>
+      <button data-nav="admin"><span class="ico"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg></span>Yönetim<span class="n" id="n_admin"></span></button>
     </nav>
 
     <!-- Liste görünümü (WhatsApp / Arama / Takip / Gönderildi) -->
@@ -560,6 +583,36 @@
       <div class="card" style="padding:6px 20px"><ul class="list compact" id="scHist"></ul></div>
     </section>
 
+    <!-- Yönetim (yalnızca Vitrin yöneticileri) -->
+    <section id="adminView" class="hide">
+      <div class="callout hide" id="admPending"><span id="admPendingTxt"></span><button class="btn sm" id="admToTeam">Ekip'te onayla</button></div>
+      <div class="card">
+        <div class="rep-head"><h2>Kullanım</h2><select id="admMonth" aria-label="Ay seçin"></select></div>
+        <div class="tiles four" id="admTiles"></div>
+        <div class="tiles four" id="admTiles2" style="margin-top:0;border-top:0"></div>
+        <p class="hint" id="admCostNote"></p>
+      </div>
+      <div class="section-t">Şirketler</div>
+      <div class="card" style="padding:6px 20px" id="admWs"></div>
+      <div class="section-t">Kullanıcılar</div>
+      <div class="card" style="padding:6px 20px" id="admUsers"></div>
+      <div id="wsAdminBox">
+        <div class="section-t">Alanlar (şirketler)</div>
+        <div class="card">
+          <div id="wsList"></div>
+          <div class="section-t" style="margin-top:18px">Yeni alan aç</div>
+          <div class="fgrid">
+            <div class="wide"><label for="nwName">Şirket adı</label><input id="nwName" maxlength="60" placeholder="Örn. Pilot Şirket"></div>
+            <div><label for="nwQuota">Aylık işletme kotası</label><input id="nwQuota" type="number" min="0" value="500" inputmode="numeric"></div>
+            <div><label class="chk" style="margin-top:30px"><input type="checkbox" id="nwDemo" checked> Demo sürüm</label></div>
+            <div class="wide"><button class="btn block" id="nwCreate">Alanı oluştur</button></div>
+          </div>
+          <p class="hint">Kullanıcıyı önce Supabase &gt; Authentication &gt; Users'tan ekleyin; giriş yaptıktan sonra yukarıdaki ekip listesinden alanını ve rolünü seçin.</p>
+        </div>
+      </div>
+
+    </section>
+
     <!-- Ekip, ayarlar (yönetici) -->
     <section id="teamView" class="hide">
       <div class="card">
@@ -588,21 +641,6 @@
             <textarea id="sTpl" style="min-height:140px" placeholder="Merhaba, …&#10;&#10;Bizden mesaj almak istemiyorsanız &quot;iptal&quot; yazmanız yeterli."></textarea>
             <p class="hint" style="margin-top:6px">Şablon yazarsanız içinde "iptal" yazarak vazgeçme cümlesi bulunmalıdır (yasal zorunluluk).</p></div>
           <div class="wide"><button class="btn primary block" id="sSave">Ayarları kaydet</button></div>
-        </div>
-      </div>
-
-      <div id="wsAdminBox" class="hide">
-        <div class="section-t">Alanlar (şirketler)</div>
-        <div class="card">
-          <div id="wsList"></div>
-          <div class="section-t" style="margin-top:18px">Yeni alan aç</div>
-          <div class="fgrid">
-            <div class="wide"><label for="nwName">Şirket adı</label><input id="nwName" maxlength="60" placeholder="Örn. Pilot Şirket"></div>
-            <div><label for="nwQuota">Aylık işletme kotası</label><input id="nwQuota" type="number" min="0" value="500" inputmode="numeric"></div>
-            <div><label class="chk" style="margin-top:30px"><input type="checkbox" id="nwDemo" checked> Demo sürüm</label></div>
-            <div class="wide"><button class="btn block" id="nwCreate">Alanı oluştur</button></div>
-          </div>
-          <p class="hint">Kullanıcıyı önce Supabase &gt; Authentication &gt; Users'tan ekleyin; giriş yaptıktan sonra yukarıdaki ekip listesinden alanını ve rolünü seçin.</p>
         </div>
       </div>
 
@@ -822,21 +860,21 @@ async function loadAccess(){
     showGate('Veritabanı güncellemesi gerekli', 'Supabase > SQL Editor\'de supabase/schema.sql dosyasının güncel halini çalıştırın, sonra tekrar deneyin.', true);
     return false;
   }
-  access = { role:a.role||'none', perms:new Set(a.perms||[]), name:a.display_name||'', platformAdmin:!!a.is_platform_admin,
+  access = { role:a.role||'none', perms:new Set([...(a.perms||[]), ...(a.is_platform_admin ? ['platform'] : [])]), name:a.display_name||'', platformAdmin:!!a.is_platform_admin,
     ws:{ id:a.workspace_id, name:a.workspace_name||'', isPlatform:!!a.is_platform, isDemo:!!a.is_demo, goal:a.weekly_goal||100, waLimit:a.wa_daily_limit||20,
          tpl:a.message_template||'', sectors:a.sector_suggestions||[], quota:a.lead_quota ?? null, used:a.leads_this_month||0 } };
   return true;
 }
-const NAV_PERM = {lists:'leads', customers:'customers', scan:'scan', hist:'leads', team:'team'};
-const NAV_OF = {whatsapp:'lists', call:'lists', followup:'lists', sent:'lists', customers:'customers', scan:'scan', hist:'hist', team:'team'};
-const VIEW_OF = {whatsapp:'callView', call:'callView', followup:'callView', sent:'callView', customers:'customersView', scan:'scanView', hist:'histView', team:'teamView'};
+const NAV_PERM = {lists:'leads', customers:'customers', scan:'scan', hist:'leads', team:'team', admin:'platform'};
+const NAV_OF = {whatsapp:'lists', call:'lists', followup:'lists', sent:'lists', customers:'customers', scan:'scan', hist:'hist', team:'team', admin:'admin'};
+const VIEW_OF = {whatsapp:'callView', call:'callView', followup:'callView', sent:'callView', customers:'customersView', scan:'scanView', hist:'histView', team:'teamView', admin:'adminView'};
 const navBtns = () => [...document.querySelectorAll('#tabs [data-nav]')];
 
 async function showApp(){
   hideAll();
   const { data:{ session } } = await sb.auth.getSession(); myId = session ? session.user.id : null;
   if(!await loadAccess()) return;
-  if(!access.perms.size){ showGate('Hesabınıza henüz yetki verilmedi', 'Yöneticinizden rol vermesini isteyin, sonra tekrar deneyin.', true); return; }
+  if(!access.perms.size){ showGate('Hesabınız onay bekliyor', 'Hesabınıza henüz yetki verilmedi. Vitrin hesabınızı şirketinizin alanına bağlayıp rol verdiğinde paneli kullanabilirsiniz.', true); return; }
   $('app').classList.remove('hide');
   navBtns().forEach(b=>b.classList.toggle('hide', !can(NAV_PERM[b.dataset.nav])));
   $('tabs').classList.toggle('hide', navBtns().filter(b=>!b.classList.contains('hide')).length < 2);
@@ -850,6 +888,7 @@ async function showApp(){
   renderSectorChips(); renderScanQuota();
   const first = navBtns().find(b=>!b.classList.contains('hide')).dataset.nav;
   if(can('customers')) loadCustomerBadge();
+  if(access.platformAdmin) loadPendingBadge();
   maybeIntro();
   await tab(first==='lists' ? list : first);
 }
@@ -859,6 +898,31 @@ $('loginForm').addEventListener('submit', async e=>{
   error ? $('loginErr').textContent='E-posta veya şifre hatalı.' : showApp();
 });
 $('logout').onclick = async ()=>{ await release(); await sb.auth.signOut(); showLogin(); };
+// Kayıt ol: hesap açılır ama rol/alan verilmeden hiçbir veri görünmez; Vitrin onaylar (Ekip/Yönetim)
+function showSignup(on){ $('loginForm').classList.toggle('hide', on); $('signupForm').classList.toggle('hide', !on); $('suMsg').textContent=''; $('suMsg').className=''; (on ? $('suName') : $('email')).focus(); }
+$('toSignup').onclick = ()=>showSignup(true);
+$('toLogin').onclick = ()=>showSignup(false);
+$('signupForm').addEventListener('submit', async e=>{
+  e.preventDefault(); const msg=$('suMsg'); msg.className='bad';
+  const name=$('suName').value.trim(), company=$('suCompany').value.trim(), phone=$('suPhone').value.trim(), email=$('suEmail').value.trim(), pw=$('suPassword').value;
+  if(name.length<2){ msg.textContent='Adınızı yazın.'; return; }
+  if(company.length<2){ msg.textContent='Şirket adını yazın.'; return; }
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ msg.textContent='Geçerli bir e-posta yazın.'; return; }
+  if(pw.length<8){ msg.textContent='Şifre en az 8 karakter olmalı.'; return; }
+  $('suBtn').disabled=true; msg.textContent='';
+  const { data, error } = await sb.auth.signUp({ email, password:pw, options:{ data:{ full_name:name, company, phone }, emailRedirectTo: location.origin } });
+  $('suBtn').disabled=false;
+  if(error){
+    const m = error.message||'';
+    msg.textContent = /already|registered|exists/i.test(m) ? 'Bu e-posta zaten kayıtlı. Giriş yapmayı deneyin.'
+      : /not allowed|disabled/i.test(m) ? 'Kayıt şu an kapalı. Vitrin ile iletişime geçin.'
+      : /password/i.test(m) ? 'Şifre yeterince güçlü değil.' : /rate|too many/i.test(m) ? 'Çok fazla deneme. Biraz sonra tekrar deneyin.' : 'Kayıt yapılamadı: '+m;
+    return;
+  }
+  if(data && data.session){ showApp(); return; }
+  msg.className='ok'; msg.textContent='Kaydınız alındı. E-postanıza gelen bağlantıyla adresinizi doğrulayın; Vitrin onayladıktan sonra giriş yapabilirsiniz.';
+  $('signupForm').reset();
+});
 async function release(){ if(current){ const id=current.id; current=null; await sb.rpc('release_business',{p_business_id:id}); } }
 
 // ---- İlk giriş tanıtımı ----
@@ -1072,12 +1136,13 @@ async function tab(which){
   navBtns().forEach(b=> b.dataset.nav===nav ? b.setAttribute('aria-current','page') : b.removeAttribute('aria-current'));
   document.querySelectorAll('#listSeg [data-tab]').forEach(b=>b.classList.toggle('on', b.dataset.tab===which));
   const view = VIEW_OF[which];
-  ['callView','customersView','histView','scanView','teamView'].forEach(v=>$(v).classList.toggle('hide', v!==view));
+  ['callView','customersView','histView','scanView','teamView','adminView'].forEach(v=>$(v).classList.toggle('hide', v!==view));
   await release();
   if(which==='hist') return loadReports();
   if(which==='scan') return loadScanHistory();
   if(which==='customers') return loadCustomers();
   if(which==='team') return loadTeam();
+  if(which==='admin') return loadAdmin();
   list = which; skipped.clear();
   $('filtersBox').classList.toggle('hide', which==='sent'); $('sentBox').classList.toggle('hide', which!=='sent');
   if(which==='sent'){ current=null; resetCardForms(); showState('skel'); await Promise.all([refreshCounts(), loadSent()]); return; }
@@ -1334,21 +1399,21 @@ let workspaces = [];
 async function loadTeam(){
   $('legalText').textContent = $('legalTpl').content.textContent;
   const plat = access.platformAdmin;
-  $('wsAdminBox').classList.toggle('hide', !plat);
   $('teamSub').textContent = plat ? 'Tüm kullanıcılar: alanını (şirketini) ve rolünü seçin. Rolü olmayan kimse hiçbir şey göremez.'
     : `${access.ws.name} ekibi: kim neyi görür burada belirlenir.`;
   $('teamHint').textContent = plat ? 'Yeni kişi eklemek için Supabase > Authentication > Users > Add user. Giriş yaptıktan sonra burada listelenir.'
     : 'Ekibinize yeni kişi eklemek için Vitrin ile iletişime geçin.';
   fillSettings(); fillPlan();
-  if(plat){ const w = await sb.rpc('list_workspaces'); if(w.error) fail(w.error); else { workspaces = w.data||[]; renderWorkspaces(); } }
+  if(plat){ const w = await sb.rpc('list_workspaces'); if(w.error) fail(w.error); else workspaces = w.data||[]; }
   const { data, error } = await sb.rpc('team_list');
   const box=$('teamList'); box.replaceChildren();
   if(error){ fail(error); return; }
   (data||[]).forEach(u=>{
     const row=el('div','trow'); const who=el('div');
-    who.append(el('div','who', (u.display_name||u.email||'—')+(u.user_id===myId?' (siz)':'')),
+    who.append(el('div','who', (u.display_name||u.full_name||u.email||'—')+(u.user_id===myId?' (siz)':'')),
                el('div','meta2', [u.email, plat && u.workspace_name ? u.workspace_name : '', u.last_sign_in_at ? 'son giriş '+fmt(u.last_sign_in_at) : 'henüz giriş yapmadı'].filter(Boolean).join(' · ')));
-    const ctrl=el('div','ctrl'+(plat?' ws':'')); const name=el('input'); name.placeholder='Görünen ad'; name.value=u.display_name||''; name.setAttribute('aria-label','Görünen ad: '+(u.email||''));
+    if(plat && u.role==='none' && (u.company||u.phone)) who.appendChild(el('div','meta2', 'Kayıt: '+[u.full_name, u.company, u.phone].filter(Boolean).join(' · ')));
+    const ctrl=el('div','ctrl'+(plat?' ws':'')); const name=el('input'); name.placeholder='Görünen ad'; name.value=u.display_name||u.full_name||''; name.setAttribute('aria-label','Görünen ad: '+(u.email||''));
     let wsSel=null;
     if(plat){ wsSel=el('select'); wsSel.setAttribute('aria-label','Alan: '+(u.email||'')); workspaces.forEach(w=>wsSel.add(new Option(w.name, w.id))); wsSel.value = u.workspace_id || access.ws.id; }
     const sel=el('select'); sel.setAttribute('aria-label','Rol: '+(u.email||''));
@@ -1360,7 +1425,7 @@ async function loadTeam(){
       const args = { p_user:u.user_id, p_role:sel.value, p_name:name.value||null }; if(wsSel) args.p_workspace = wsSel.value;
       const { error } = await sb.rpc('set_user_role',args); btn.disabled=false;
       if(error){ toast('Kaydedilemedi: '+error.message); return; }
-      toast('Yetki güncellendi'); loadTeam();
+      toast('Yetki güncellendi'); loadTeam(); if(plat) loadPendingBadge();
     };
     if(wsSel) ctrl.append(name, wsSel, sel, btn); else ctrl.append(name, sel, btn);
     row.append(who, ctrl); box.appendChild(row);
@@ -1378,7 +1443,7 @@ $('sSave').onclick = async ()=>{
     sector_suggestions:$('sSectors').value.split(',').map(s=>s.trim()).filter(Boolean) };
   busy=true; const { error } = await sb.rpc('update_workspace',{ p_ws:access.ws.id, p_patch:patch }); busy=false;
   if(error){ toast('Kaydedilemedi: '+error.message); return; }
-  toast('Ayarlar kaydedildi'); await loadAccess(); applyWsSettings(); fillSettings(); if(access.platformAdmin) loadTeam();
+  toast('Ayarlar kaydedildi'); await loadAccess(); applyWsSettings(); fillSettings();
 };
 function applyWsSettings(){
   $('weekGoal').textContent = access.ws.goal; $('waLimit').textContent = access.ws.waLimit;
@@ -1403,7 +1468,7 @@ function renderWorkspaces(){
       const q=el('input'); q.type='number'; q.min='0'; q.placeholder='Kota (boş = sınırsız)'; q.value = w.lead_quota ?? ''; q.setAttribute('aria-label','Aylık kota: '+w.name);
       const b=el('button','btn sm','Kaydet'); b.type='button';
       b.onclick=async ()=>{ b.disabled=true; const { error } = await sb.rpc('update_workspace',{ p_ws:w.id, p_patch:{ is_demo:cb.checked, lead_quota:q.value.trim() } }); b.disabled=false;
-        if(error){ toast('Kaydedilemedi: '+error.message); return; } toast('Alan güncellendi'); loadTeam(); };
+        if(error){ toast('Kaydedilemedi: '+error.message); return; } toast('Alan güncellendi'); loadAdmin(); };
       ctrl.append(lab, q, b); row.appendChild(ctrl);
     }
     box.appendChild(row);
@@ -1414,8 +1479,43 @@ $('nwCreate').onclick = async ()=>{
   if(name.length<2){ toast('Şirket adını yazın'); return; }
   busy=true; const { error } = await sb.rpc('create_workspace',{ p_name:name, p_is_demo:$('nwDemo').checked, p_quota:q===''?null:Number(q) }); busy=false;
   if(error){ toast('Oluşturulamadı: '+error.message); return; }
-  $('nwName').value=''; toast('Alan oluşturuldu: '+name); loadTeam();
+  $('nwName').value=''; toast('Alan oluşturuldu: '+name); loadAdmin();
 };
+// ---- Yönetim (yalnızca Vitrin yöneticileri): kim, ne kadar kullandı ----
+const USD = new Intl.NumberFormat('tr-TR',{style:'currency',currency:'USD',maximumFractionDigits:2});
+(function fillAdmMonths(){ const sel=$('admMonth'), d=new Date(); d.setDate(1);
+  for(let i=0;i<12;i++){ const v=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-01';
+    sel.add(new Option(i===0?'Bu ay':d.toLocaleDateString('tr-TR',{month:'long',year:'numeric'}), v)); d.setMonth(d.getMonth()-1); } })();
+$('admMonth').onchange = ()=>loadAdmin();
+$('admToTeam').onclick = ()=>tab('team');
+function setPending(n){ $('n_admin').textContent = n || ''; $('admPending').classList.toggle('hide', !n);
+  $('admPendingTxt').textContent = n ? `${n} kişi onay bekliyor: kayıt oldu, henüz bir alana bağlanmadı.` : ''; }
+async function loadPendingBadge(){ const { data } = await sb.rpc('admin_usage',{ p_month:null }); if(data) setPending(data.totals.pending); }
+const ROLE_SHORT = {admin:'Yönetici', sales:'Satış', designer:'Operasyon', none:'Onay bekliyor'};
+function admRow(box, title, sub, right, rightLabel){
+  const row=el('div','adm-row'); const l=el('div'); l.append(el('div','t',title), el('div','s',sub));
+  const r=el('div','r'); r.append(el('b',null,right), rightLabel); row.append(l, r); box.appendChild(row);
+}
+async function loadAdmin(){
+  const [u, w] = await Promise.all([ sb.rpc('admin_usage',{ p_month:$('admMonth').value }), sb.rpc('list_workspaces') ]);
+  if(u.error){ fail(u.error); return; }
+  const d=u.data, t=d.totals, cpc=Number(d.cost_per_call)||0; setPending(t.pending);
+  tiles($('admTiles'), [[NUM.format(t.api_calls),'Google çağrısı'],[USD.format(t.api_calls*cpc),'tahmini maliyet'],[NUM.format(t.leads),'bulunan işletme'],[NUM.format(t.actions),'işlem (arama/yazma)']]);
+  tiles($('admTiles2'), [[NUM.format(t.active_users),'aktif kullanıcı'],[NUM.format(t.users),'toplam kullanıcı'],[NUM.format(t.scans),'tarama'],[TRY.format(t.sales_total||0),'kayıtlı satış']]);
+  $('admCostNote').textContent = `Maliyet, Google çağrısı başına ~${new Intl.NumberFormat('tr-TR',{style:'currency',currency:'USD',maximumFractionDigits:3}).format(cpc)} varsayımıyla tahmindir (ücretsiz kota ve deneme kredisi düşülmez). Panelde yapay zekâ kullanılmadığı için token harcaması yoktur.`;
+  const wb=$('admWs'); wb.replaceChildren();
+  (d.workspaces||[]).forEach(x=>admRow(wb, x.name + (x.is_platform?' (platform)':x.is_demo?' · Demo':''),
+    `${x.members} kişi · ${NUM.format(x.leads)}${x.lead_quota!=null?'/'+NUM.format(x.lead_quota):''} işletme · ${NUM.format(x.actions)} işlem · ${x.positive} olumlu · ${x.won} satış`
+      + (x.last_activity ? ' · son hareket '+daysAgo(x.last_activity) : ' · hareket yok'),
+    USD.format(x.api_calls*cpc), `${NUM.format(x.api_calls)} çağrı`));
+  const ub=$('admUsers'); ub.replaceChildren();
+  (d.users||[]).forEach(x=>admRow(ub, (x.name||x.email) + (x.id===myId?' (siz)':''),
+    [x.email, x.workspace || x.company || '', ROLE_SHORT[x.role]||x.role, x.last_sign_in_at ? 'son giriş '+daysAgo(x.last_sign_in_at) : 'hiç giriş yapmadı'].filter(Boolean).join(' · ')
+      + ` · ${NUM.format(x.actions)} işlem · ${NUM.format(x.scans)} tarama`,
+    NUM.format(x.api_calls), 'Google çağrısı'));
+  if(w.error) fail(w.error); else { workspaces = w.data||[]; renderWorkspaces(); }
+}
+
 // Paketler
 function openPkgs(){ $('pkgNote').classList.toggle('hide', !access.ws.isDemo); $('pkgDlg').showModal(); }
 $('demoPkgs').onclick = openPkgs; $('planPkgs').onclick = openPkgs;

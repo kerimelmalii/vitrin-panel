@@ -297,7 +297,7 @@ async function authenticate(req: Request, env: Env, f: Fetch): Promise<string> {
   return u.id;
 }
 
-interface Ctx { workspace_id: string; lead_quota: number | null; leads_this_month: number }
+interface Ctx { workspace_id: string; user_id: string; lead_quota: number | null; leads_this_month: number }
 
 async function usageToday(db: Db, ctx: Ctx, now: number): Promise<number> {
   const rows = await db.get(`/scan_history?select=api_calls&workspace_id=eq.${ctx.workspace_id}&scanned_at=gte.${encodeURIComponent(istanbulDayStart(now))}`);
@@ -405,7 +405,7 @@ async function run(db: Db, env: Env, ctx: Ctx, f: Fetch, body: any, now: number)
     capped = rows.length - qLeft;
   }
   const saved = toSave.length ? Number(await db.rpc("ingest_businesses", { p_workspace: ctx.workspace_id, p_rows: toSave })) || 0 : 0;
-  await db.insert("scan_history", { workspace_id: ctx.workspace_id, city, district, sector, places_found: found, saved, api_calls: calls });
+  await db.insert("scan_history", { workspace_id: ctx.workspace_id, user_id: ctx.user_id, city, district, sector, places_found: found, saved, api_calls: calls });
   if (capped) warning = [warning, `Aylık kota nedeniyle ${capped} işletme kaydedilmedi.`].filter(Boolean).join(" ");
   const quota = quotaInfo({ ...ctx, leads_this_month: ctx.leads_this_month + saved });
   return { city, district, sector, found, matched: rows.length, saved, calls, reasons, warning, used: used + calls, limit: env.MAX_CALLS_PER_DAY, quota };
@@ -423,7 +423,7 @@ export async function handle(req: Request, env: Env, f: Fetch = fetch, now = Dat
     if (!c || c.can_scan !== true || !c.workspace_id) {
       throw new UserError("forbidden", "Bu işlem için yetkiniz yok. Yöneticinizden tarama yetkisi isteyin.", 403);
     }
-    const ctx: Ctx = { workspace_id: String(c.workspace_id), lead_quota: c.lead_quota == null ? null : Number(c.lead_quota), leads_this_month: Number(c.leads_this_month) || 0 };
+    const ctx: Ctx = { workspace_id: String(c.workspace_id), user_id: userId, lead_quota: c.lead_quota == null ? null : Number(c.lead_quota), leads_this_month: Number(c.leads_this_month) || 0 };
     if (!/^[0-9a-f-]{36}$/i.test(ctx.workspace_id)) throw new UserError("forbidden", "Alan bilgisi geçersiz.", 403);
     let body: any;
     try { body = await req.json(); } catch { throw new UserError("bad_json", "Geçersiz istek."); }

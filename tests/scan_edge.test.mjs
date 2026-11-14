@@ -128,7 +128,7 @@ test('run: filtre yoksa hepsini, filtreyle uyanları kaydeder; alana yazar, anah
   assert.equal(r.status, 200);
   assert.deepEqual([j.found, j.matched, j.saved, j.calls], [2, 2, 2, 1]);
   assert.equal(w.log.ingestWs, WS);
-  assert.deepEqual(w.log.history[0], { workspace_id: WS, city: 'Ankara', district: 'Çankaya', sector: 'kuaför', places_found: 2, saved: 2, api_calls: 1 });
+  assert.deepEqual(w.log.history[0], { workspace_id: WS, user_id: 'u1', city: 'Ankara', district: 'Çankaya', sector: 'kuaför', places_found: 2, saved: 2, api_calls: 1 });
   assert.ok(!JSON.stringify(j).includes('sb_secret'));
   w = world();
   j = await (await call(w, { action: 'run', city: 'Ankara', district: 'Çankaya', sector: 'kuaför', filters: { min_rating: 4 } })).json();

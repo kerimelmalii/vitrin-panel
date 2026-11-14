@@ -12,7 +12,7 @@
   };
   const has = p => (PERMS[role] || []).includes(p);
   const deny = () => ({ error: { message: 'Bu işlem için yetkiniz yok' } });
-  window.__calls = [];
+  window.__calls = []; window.__signups = [];
   window.__loggedIn = !!window.__preLogged;
 
   const WS = {
@@ -50,7 +50,8 @@
   const users = [
     { user_id: 'u1', email: 'kerim@vitrin.test', display_name: 'Kerim', role: 'admin', workspace_id: 'w0', workspace_name: 'Vitrin', last_sign_in_at: now() },
     { user_id: 'u2', email: 'arkadas@vitrin.test', display_name: null, role: 'sales', workspace_id: 'w0', workspace_name: 'Vitrin', last_sign_in_at: now() },
-    { user_id: 'u3', email: 'yeni@pilot.test', display_name: null, role: 'none', workspace_id: null, workspace_name: null, last_sign_in_at: null },
+    { user_id: 'u3', email: 'yeni@pilot.test', display_name: null, role: 'none', workspace_id: null, workspace_name: null, last_sign_in_at: null,
+      full_name: 'Deniz Kaya', company: 'Kaya Hukuk', phone: '0532 000 00 00' },
     { user_id: 'u4', email: 'ali@pilot.test', display_name: 'Ali', role: 'sales', workspace_id: 'w1', workspace_name: 'Pilot Şirket', last_sign_in_at: null },
   ];
   const needs = (perm, fn) => a => has(perm) ? fn(a) : deny();
@@ -98,7 +99,14 @@
     delete_sale: needs('customers_write', a => { const i = sales.findIndex(s => s.id === a.p_id); const s = sales.splice(i, 1)[0]; addNote(s.customer_id, 'edit', 'Satış silindi: ' + s.product); return null; }),
     create_customer: needs('customers_write', a => { const id = 'c' + (++seq); customers.unshift({ id, business_id: null, name: a.p_name, phone: a.p_phone, city: a.p_city, sector: a.p_sector, stage: 'contacted',
       next_step: null, next_step_at: null, stage_changed_at: now() }); addNote(id, 'created', a.p_note || 'Müşteri elle eklendi'); return id; }),
-    team_list: needs('team', () => users.filter(u => ws.is_platform || u.workspace_id === ws.id).map(u => ({ ...u }))),
+    team_list: needs('team', () => users.filter(u => ws.is_platform || u.workspace_id === ws.id).map(u => ws.is_platform ? { ...u } : { ...u, company: null, phone: null })),
+    admin_usage: a => (role === 'admin' && ws.is_platform) ? { month: (a.p_month || '').slice(0, 7), cost_per_call: 0.035,
+      totals: { api_calls: 42, scans: 14, leads: 62, actions: log.length + 9, wa_sent: 3, won: 1, sales_total: 8500, active_users: 2, users: users.length,
+        pending: users.filter(u => u.role === 'none').length },
+      workspaces: [{ id: 'w0', name: 'Vitrin', is_platform: true, is_demo: false, lead_quota: null, members: 2, api_calls: 30, scans: 10, leads: 31, actions: 9, positive: 3, won: 1, sales_total: 8500, last_activity: now() },
+                   { id: 'w1', name: 'Pilot Şirket', is_platform: false, is_demo: true, lead_quota: 500, members: 1, api_calls: 12, scans: 4, leads: 120, actions: 0, positive: 0, won: 0, sales_total: 0, last_activity: null }],
+      users: users.map(u => ({ id: u.user_id, email: u.email, name: u.display_name || u.full_name || null, company: u.company || null, workspace: u.workspace_name, role: u.role,
+        created_at: now(), last_sign_in_at: u.last_sign_in_at, actions: u.user_id === 'u1' ? 9 : 0, scans: u.user_id === 'u1' ? 10 : 0, api_calls: u.user_id === 'u1' ? 30 : 0, leads: 0, last_activity: null })) } : deny(),
     set_user_role: needs('team', a => { const u = users.find(x => x.user_id === a.p_user); u.role = a.p_role; if (a.p_name) u.display_name = a.p_name;
       if (a.p_workspace) { u.workspace_id = a.p_workspace; u.workspace_name = workspaces.find(w => w.id === a.p_workspace).name; } return null; }),
     list_workspaces: () => (role === 'admin' && ws.is_platform) ? workspaces.map(w => ({ ...w })) : deny(),
@@ -126,6 +134,8 @@
       getSession: async () => ({ data: { session: session() } }),
       signInWithPassword: async ({ password }) => password === 'dogru' ? (window.__loggedIn = true, { error: null }) : { error: { message: 'bad' } },
       signOut: async () => { window.__loggedIn = false; },
+      signUp: async ({ email, options }) => { (window.__signups = window.__signups || []).push({ email, data: options && options.data });
+        return /^var@/.test(email) ? { data: {}, error: { message: 'User already registered' } } : { data: { user: { id: 'n1' }, session: null }, error: null }; },
       onAuthStateChange: () => ({}),
     },
     rpc: async (name, args) => {
