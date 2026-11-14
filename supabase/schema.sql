@@ -677,6 +677,8 @@ begin
     if cur.user_id is null or cur.workspace_id <> my then raise exception 'Bu kullanıcı sizin alanınızda değil'; end if;
     if p_workspace is not null and p_workspace <> my then raise exception 'Kullanıcıyı başka alana taşıyamazsınız'; end if;
   end if;
+  -- Henüz bir alana bağlı olmayan kişi yanlışlıkla platform alanına düşmesin: alan açıkça seçilmeli
+  if plat and cur.user_id is null and p_workspace is null and p_role <> 'none' then raise exception 'Önce şirketini seçin'; end if;
   target_ws := coalesce(p_workspace, cur.workspace_id, my);
   if not exists (select 1 from public.workspaces where id = target_ws) then raise exception 'Alan bulunamadı'; end if;
   -- Bir alanın son yöneticisi kaldırılamaz/düşürülemez/taşınamaz
