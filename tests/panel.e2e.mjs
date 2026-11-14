@@ -292,7 +292,7 @@ assert.match(await txt('.trow:nth-child(3)'), /Kayıt: Deniz Kaya · Kaya Hukuk 
 await shot('11-ekip'); await axe('ekip'); ok('platform yöneticisi: herkes listelenir, alan seçimi var; kayıt olanın ad/şirket/telefonu görünür');
 assert.equal(await page.inputValue('.trow:nth-child(3) select >> nth=0'), ''); assert.match(await txt('.trow:nth-child(3)'), /Şirket[\s\S]*Rol/);
 await page.selectOption('.trow:nth-child(3) select >> nth=1', 'sales'); await page.click('.trow:nth-child(3) button');
-await page.waitForFunction(() => document.getElementById('toast').textContent.includes('Önce şirketini seçin')); assert.equal(await count('set_user_role'), 0);
+await page.waitForFunction(() => document.getElementById('toast').textContent.includes('Önce kişinin şirketini seçin')); assert.equal(await count('set_user_role'), 0);
 ok('onay bekleyen kişide şirket boş gelir; şirket seçmeden rol verilemez (Vitrin\'e yanlışlıkla bağlanmaz)');
 await page.selectOption('.trow:nth-child(3) select >> nth=0', 'w1'); await page.selectOption('.trow:nth-child(3) select >> nth=1', 'admin');
 await page.fill('.trow:nth-child(3) input', 'Ayşe'); await page.click('.trow:nth-child(3) button');

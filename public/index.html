@@ -423,12 +423,12 @@
       <div id="empty" class="card empty hide" aria-live="polite">
         <svg class="shop" aria-hidden="true"><use href="#shop"/></svg>
         <h3>Bu liste temiz</h3>
-        <p>Şu an işlenecek işletme kalmadı. Başka listeye bakabilir ya da yeni bir bölge tarayabilirsin.</p>
+        <p>Şu an işlenecek işletme kalmadı. Başka listeye bakabilir ya da yeni bir bölge tarayabilirsiniz.</p>
         <div class="row2"><button class="btn" id="emptyOther">Başka liste</button><button class="btn primary" id="emptyScan">Yeni bölge tara</button></div>
       </div>
 
       <div id="loadErr" class="card errbox hide" role="alert">
-        <h3>Yüklenemedi</h3><p id="loadErrTxt">Bağlantıyı kontrol edip tekrar dene.</p>
+        <h3>Yüklenemedi</h3><p id="loadErrTxt">Bağlantıyı kontrol edip tekrar deneyin.</p>
         <div class="row2"><button class="btn primary" id="retry">Tekrar dene</button></div>
       </div>
 
@@ -539,20 +539,20 @@
       <div class="card">
         <div class="scan-h">
           <div class="logo"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20.5 20.5l-4.4-4.4"/></svg></div>
-          <div><h2>Yeni müşteri bul</h2><p>Seçtiğin bölge ve sektördeki işletmeleri Google Haritalar'dan bulur, listene ekler.</p></div>
+          <div><h2>Yeni müşteri bul</h2><p>Seçtiğiniz bölge ve sektördeki işletmeleri Google Haritalar'dan bulur, listenize ekler.</p></div>
         </div>
         <div class="quota hide" id="scQuota"></div>
         <label for="scCity">Şehir</label>
         <input id="scCity" list="provinces" placeholder="Ankara" autocomplete="off"><datalist id="provinces"></datalist>
         <div class="space"></div>
-        <label for="scDistricts">İlçeler <span class="muted" style="font-weight:500">(aşağıdan seç ya da virgülle yaz; boşsa tüm şehir)</span></label>
+        <label for="scDistricts">İlçeler <span class="muted" style="font-weight:500">(aşağıdan seçin ya da virgülle yazın; boşsa tüm şehir)</span></label>
         <input id="scDistricts" placeholder="Ataşehir, Kadıköy, Ümraniye" autocomplete="off">
         <div id="districtPick" class="hide">
           <div class="pickhead"><span class="muted" id="districtCount"></span><span><span class="muted" id="districtSel"></span> <button type="button" class="link hide" id="districtClear">Temizle</button></span></div>
           <div class="chips picks" id="districtChips" role="group" aria-label="İlçe seçimi"></div>
         </div>
         <div class="space"></div>
-        <label for="scSectors">Sektörler <span class="muted" style="font-weight:500">(virgülle ayır; aşağıdan seç ya da kendin yaz)</span></label>
+        <label for="scSectors">Sektörler <span class="muted" style="font-weight:500">(virgülle ayırın; aşağıdan seçin ya da kendiniz yazın)</span></label>
         <input id="scSectors" placeholder="diş kliniği, avukat" autocomplete="off">
         <div class="chips" id="sectorChips" aria-label="Sektör önerileri"></div>
 
@@ -577,10 +577,10 @@
           <summary><span>Daha verimli tarama için öneriler</span></summary>
           <div class="in">
             <ul>
-              <li><b>Sektörü dar yaz.</b> "hastane" yerine "özel hastane", "tıp merkezi", "poliklinik", "diş kliniği", "fizik tedavi merkezi" gibi. Geniş adlar acil servis, otopark, laboratuvar gibi birimleri de getirir; bunların çoğunda telefon olmadığı için elenir.</li>
-              <li><b>Birden fazla ilçeyi birlikte seç.</b> Her ilçe ayrı taranır ve ilçe başına en çok 60 sonuç gelir. Komşu ilçeleri (örneğin Ataşehir ile Kadıköy, Ümraniye, Maltepe) aynı anda seçebilirsin.</li>
-              <li><b>Büyük şehirlerde ilçe ilçe tara.</b> İlçe seçmezsen bütün şehir tek sorguda taranır ve yine en çok 60 sonuç gelir; ilçe ilçe taramak çok daha fazla işletme bulur.</li>
-              <li><b>Aynı yeri tekrar tarama.</b> Aynı ilçe ve sektör ikinci kez tarandığında sonuçların çoğu zaten listende olur. Kotanı yeni ilçe ve sektörlere harca.</li>
+              <li><b>Sektörü dar yazın.</b> "hastane" yerine "özel hastane", "tıp merkezi", "poliklinik", "diş kliniği", "fizik tedavi merkezi" gibi. Geniş adlar acil servis, otopark, laboratuvar gibi birimleri de getirir; bunların çoğunda telefon olmadığı için elenir.</li>
+              <li><b>Birden fazla ilçeyi birlikte seçin.</b> Her ilçe ayrı taranır ve ilçe başına en çok 60 sonuç gelir. Komşu ilçeleri (örneğin Ataşehir ile Kadıköy, Ümraniye, Maltepe) aynı anda seçebilirsiniz.</li>
+              <li><b>Büyük şehirlerde ilçe ilçe tarayın.</b> İlçe seçmezseniz bütün şehir tek sorguda taranır ve yine en çok 60 sonuç gelir; ilçe ilçe taramak çok daha fazla işletme bulur.</li>
+              <li><b>Aynı yeri tekrar taramayın.</b> Aynı ilçe ve sektör ikinci kez tarandığında sonuçların çoğu zaten listenizde olur. Kotanızı yeni ilçe ve sektörlere ayırın.</li>
             </ul>
           </div>
         </details>
@@ -956,10 +956,10 @@ async function release(){ if(current){ const id=current.id; current=null; await 
 
 // ---- İlk giriş tanıtımı ----
 const INTRO = [
-  {perm:'scan', k:'1 · Tara', t:'Yeni müşteri bul', p:'Tara sekmesinde şehir, ilçe ve sektör seç. Uygun işletmeler bulunur ve listene eklenir. İstersen puan, yorum ve çalışma günlerine göre filtrele.'},
-  {perm:'leads', k:'2 · Liste', t:'Sırayla ulaş', p:'Liste sana her seferinde tek bir işletme gösterir. WhatsApp\'tan yaz ya da ara, sonra sonucu işaretle: ilgilendi, sonra ara, ilgilenmiyor…'},
-  {perm:'customers', k:'3 · Müşteriler', t:'Satışa kadar takip et', p:'İlgilenenler Müşteriler\'e düşer. Aşamayı ilerlet, hangi üründen kaç adet ve kaça sattığını gir.'},
-  {perm:'leads', k:'4 · Raporlar', t:'Ay sonunda sonucu gör', p:'Kaç işletmeye ulaşıldı, kaçı olumlu, kaçı reddetti ve neden, ne kadar satış yapıldı: hepsi Raporlar\'da.'},
+  {perm:'scan', k:'1 · Tara', t:'Yeni müşteri bul', p:'Tara sekmesinde şehir, ilçe ve sektör seçin. Uygun işletmeler bulunur ve listenize eklenir. İsterseniz puan, yorum ve çalışma günlerine göre filtreleyebilirsiniz.'},
+  {perm:'leads', k:'2 · Liste', t:'Sırayla ulaşın', p:'Liste size her seferinde tek bir işletme gösterir. WhatsApp\'tan yazın ya da arayın, sonra sonucu işaretleyin: ilgilendi, sonra ara, ilgilenmiyor…'},
+  {perm:'customers', k:'3 · Müşteriler', t:'Satışa kadar takip edin', p:'İlgilenenler Müşteriler\'e düşer. Aşamayı ilerletin; hangi üründen kaç adet ve kaça sattığınızı girin.'},
+  {perm:'leads', k:'4 · Raporlar', t:'Ay sonunda sonucu görün', p:'Kaç işletmeye ulaşıldı, kaçı olumlu, kaçı reddetti ve neden, ne kadar satış yapıldı: hepsi Raporlar\'da.'},
 ];
 let introSteps = [], introI = 0;
 const introKey = () => 'vitrin_intro_v1_' + (myId||'');
@@ -1025,7 +1025,7 @@ async function loadNext(){
   const r = await sb.rpc('next_business',{ p_list:list, p_city:$('cityFilter').value||null,
                                            p_sector:$('sectorFilter').value||null, p_skip:[...skipped] });
   if(my !== seq) return;                       // aradan başka bir istek geçtiyse bunu yok say
-  if(r.error){ showState('err'); $('loadErrTxt').textContent = r.error.message || 'Bağlantıyı kontrol edip tekrar dene.'; console.error(r.error); return; }
+  if(r.error){ showState('err'); $('loadErrTxt').textContent = r.error.message || 'Bağlantıyı kontrol edip tekrar deneyin.'; console.error(r.error); return; }
   const pick = (r.data||[])[0];
   if(!pick){ showState('empty'); return; }
   await renderBiz(pick, my);
@@ -1081,13 +1081,13 @@ function setupWa(b){
   $('btnWaSent').classList.toggle('hide', !mob);
   btn.disabled = !mob; btn.classList.toggle('hide', !mob);
   $('callBtn').parentElement.style.gridTemplateColumns = mob ? '' : '1fr';
-  hint.textContent = !mob ? 'Sabit hat: WhatsApp yok, arayarak ulaşabilirsin.'
-    : access.ws.tpl ? 'Mesaj hazır yazılmış açılır; gözden geçirip gönder, sonra "WhatsApp gönderdim" de.'
-    : 'Sohbet boş açılır, mesajını yaz. Hazır şablonu yönetici Ekip > Ayarlar\'dan ekleyebilir.';
+  hint.textContent = !mob ? 'Sabit hat: WhatsApp yok, arayarak ulaşabilirsiniz.'
+    : access.ws.tpl ? 'Mesaj hazır yazılmış açılır; gözden geçirip gönderin, sonra "WhatsApp gönderdim"e basın.'
+    : 'Sohbet boş açılır, mesajınızı yazın. Hazır şablonu yönetici Ekip > Ayarlar\'dan ekleyebilir.';
 }
 $('waBtn').onclick = ()=>{
   if(!current || !isMobile(current)) return;
-  if(waTodayCount >= access.ws.waLimit) toast('Bugünkü önerilen WhatsApp sınırına ulaştın (' + access.ws.waLimit + '). Yarın devam etmek numaranı korur.');
+  if(waTodayCount >= access.ws.waLimit) toast('Bugünkü önerilen WhatsApp sınırına ulaştınız (' + access.ws.waLimit + '). Yarın devam etmek numaranızı korur.');
   window.open(waLink(current), 'vitrin_wa');   // hep aynı sekme: WhatsApp Web her seferinde yeni sekme açmaz
 };
 
@@ -1315,7 +1315,7 @@ function renderCustomers(){
   });
   $('custEmpty').classList.toggle('hide', rows.length>0);
   $('custEmptyT').textContent = customers.length ? 'Sonuç yok' : 'Henüz müşteri yok';
-  $('custEmptyP').textContent = customers.length ? 'Bu aşamada ya da aramada müşteri bulunamadı.' : 'Listede "İlgilendi" ya da "Satış oldu" dediğin işletmeler burada otomatik görünür. Elle de ekleyebilirsin.';
+  $('custEmptyP').textContent = customers.length ? 'Bu aşamada ya da aramada müşteri bulunamadı.' : 'Listede "İlgilendi" ya da "Satış oldu" dediğiniz işletmeler burada otomatik görünür. Elle de ekleyebilirsiniz.';
 }
 let cTimer; $('custSearch').oninput = e=>{ custTerm=e.target.value; clearTimeout(cTimer); cTimer=setTimeout(renderCustomers,150); };
 
@@ -1429,7 +1429,7 @@ let workspaces = [];
 async function loadTeam(){
   $('legalText').textContent = $('legalTpl').content.textContent;
   const plat = access.platformAdmin;
-  $('teamSub').textContent = plat ? 'Tüm kullanıcılar: alanını (şirketini) ve rolünü seçin. Rolü olmayan kimse hiçbir şey göremez.'
+  $('teamSub').textContent = plat ? 'Tüm kullanıcılar: her kişinin şirketini ve rolünü seçin. Rolü olmayan kimse hiçbir şey göremez.'
     : `${access.ws.name} ekibi: kim neyi görür burada belirlenir.`;
   $('teamHint').textContent = plat ? 'Yeni kişi eklemek için Supabase > Authentication > Users > Add user. Giriş yaptıktan sonra burada listelenir.'
     : 'Ekibinize yeni kişi eklemek için Vitrin ile iletişime geçin.';
@@ -1453,7 +1453,7 @@ async function loadTeam(){
     [['none','Yetkisiz'],['sales','Satış'],['designer','Operasyon'],['admin','Yönetici']].forEach(([v,t])=>sel.add(new Option(t,v))); sel.value=u.role;
     const btn=el('button','btn sm','Kaydet'); btn.type='button';
     btn.onclick=async ()=>{
-      if(wsSel && !wsSel.value && sel.value!=='none'){ toast('Önce şirketini seçin'); wsSel.focus(); return; }
+      if(wsSel && !wsSel.value && sel.value!=='none'){ toast('Önce kişinin şirketini seçin'); wsSel.focus(); return; }
       if(sel.value==='none' && u.role!=='none' && !await confirmDlg('Yetki kaldırılsın mı?', `${u.email} artık hiçbir şeyi göremeyecek.`, 'Evet, kaldır')) return;
       btn.disabled=true;
       const args = { p_user:u.user_id, p_role:sel.value, p_name:name.value||null }; if(wsSel) args.p_workspace = wsSel.value;
@@ -1578,7 +1578,7 @@ function renderDistrictChips(){
 }
 function syncDistrictChips(){ const cur=districtList(); let n=0;
   document.querySelectorAll('#districtChips .chip').forEach(c=>{ const on=cur.includes(trLower(c.textContent)); c.classList.toggle('on',on); c.setAttribute('aria-pressed',String(on)); if(on) n++; });
-  $('districtSel').textContent = cur.length ? `${cur.length} ilçe seçili` : 'Hiç seçmezsen bütün şehir taranır'; $('districtClear').classList.toggle('hide', !cur.length); }
+  $('districtSel').textContent = cur.length ? `${cur.length} ilçe seçili` : 'Hiç seçmezseniz bütün şehir taranır'; $('districtClear').classList.toggle('hide', !cur.length); }
 $('scCity').addEventListener('input', renderDistrictChips);
 $('scDistricts').addEventListener('input', syncDistrictChips);
 $('districtClear').onclick = ()=>{ $('scDistricts').value=''; syncDistrictChips(); resetScanPlan(); };
