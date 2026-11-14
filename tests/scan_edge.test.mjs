@@ -17,6 +17,8 @@ test('ortak test verisi: işletme filtresi', () => {
     if (k.ok) { assert.ok(row && !why, `${k.name}: ${why}`); } else { assert.equal(row, undefined, k.name); assert.equal(why, k.why, k.name); }
     if (row && k.phone) assert.equal(row.phone_normalized, k.phone);
     if (row && k.website) assert.equal(row.website_status, k.website);
+    if (row && k.category) assert.equal(row.category, k.category);
+    if (row && !k.place.primaryTypeDisplayName) assert.equal(row.category, null);
   }
 });
 

@@ -159,6 +159,47 @@
    "website": "none"
   },
   {
+   "name": "kategori: hastane",
+   "city": "Ankara",
+   "district": "Çankaya",
+   "sector": "özel hastane",
+   "place": {
+    "primaryType": "hospital",
+    "primaryTypeDisplayName": {
+     "text": "Hastane"
+    }
+   },
+   "ok": true,
+   "category": "Hastane"
+  },
+  {
+   "name": "kategori: otopark elenir",
+   "city": "Ankara",
+   "district": "Çankaya",
+   "sector": "hastane",
+   "place": {
+    "primaryType": "parking",
+    "primaryTypeDisplayName": {
+     "text": "Otopark"
+    }
+   },
+   "why": "kategori uygun değil"
+  },
+  {
+   "name": "kategori: eczane elenmez",
+   "city": "Ankara",
+   "district": "Çankaya",
+   "sector": "eczane",
+   "place": {
+    "primaryType": "pharmacy",
+    "primaryTypeDisplayName": {
+     "text": "Eczane"
+    }
+   },
+   "ok": true,
+   "category": "Eczane"
+  },
+  {
    "name": "filtre yoksa düşük puan da geçer",
    "city": "Ankara",
    "district": "Çankaya",

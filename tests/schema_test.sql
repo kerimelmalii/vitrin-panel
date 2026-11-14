@@ -27,13 +27,15 @@ insert into public.user_roles (user_id, role, workspace_id) values
 select set_config('t.plat', public.platform_ws()::text, false);
 set role service_role;
 select pg_temp.assert(public.ingest_businesses(public.platform_ws(), '[
- {"place_id":"p1","name":"Cep Kuaför","city":"Ankara","district":"Çankaya","sector":"kuaför","phone_raw":"0532 111 22 33","phone_normalized":"+905321112233","rating":4.8,"review_count":50,"website_status":"none","lead_score":90},
+ {"place_id":"p1","name":"Cep Kuaför","city":"Ankara","district":"Çankaya","sector":"kuaför","phone_raw":"0532 111 22 33","phone_normalized":"+905321112233","rating":4.8,"review_count":50,"website_status":"none","lead_score":90,"category":"Kuaför","category_type":"hair_salon"},
  {"place_id":"p2","name":"Sabit Kuaför","city":"Ankara","district":"Çankaya","sector":"kuaför","phone_raw":"0312 111 22 33","phone_normalized":"+903121112233","rating":4.5,"review_count":20,"website_status":"has_site","lead_score":70},
  {"place_id":"p1","name":"Aynı place","city":"Ankara","sector":"kuaför","phone_normalized":"+905550000000"},
  {"place_id":"p3","name":"Aynı telefon","city":"Ankara","sector":"kuaför","phone_normalized":"+905321112233"},
  {"place_id":"p4","name":"Üçüncü","city":"İzmir","district":"Bornova","sector":"diş","phone_normalized":"+905329998877","rating":4.4,"review_count":12,"website_status":"none","lead_score":60}
 ]'::jsonb) = 3, 'tekrarlar (place_id/telefon) atlanmalı, 3 kayıt kalmalı');
 select pg_temp.assert(public.ingest_businesses(public.platform_ws(), '[{"place_id":"p1","name":"x","city":"a","sector":"b"}]') = 0, 'tekrar ingest 0 eklemeli');
+select pg_temp.assert((select category || '/' || category_type from public.businesses where place_id = 'p1' and workspace_id = public.platform_ws()) = 'Kuaför/hair_salon', 'kategori kaydedildi');
+select pg_temp.assert((select category from public.businesses where place_id = 'p2') is null, 'kategorisiz kayıt boş kalır');
 -- Aynı işletme başka alanda serbestçe eklenebilir (alanlar birbirini etkilemez)
 select pg_temp.assert(public.ingest_businesses('99999999-0000-0000-0000-000000000001', '[
  {"place_id":"p1","name":"Cep Kuaför (pilot)","city":"Ankara","district":"Çankaya","sector":"diş kliniği","phone_raw":"0532 111 22 33","phone_normalized":"+905321112233","lead_score":50},

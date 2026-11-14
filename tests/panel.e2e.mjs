@@ -104,6 +104,7 @@ await page.waitForTimeout(700); await shot('03-whatsapp'); await axe('whatsapp k
 assert.equal(await txt('#bName'), 'Mavi Kuaför | Çankaya Saç Tasarım'); ok('en yüksek skorlu cep numarası WhatsApp listesinde ilk');
 assert.doesNotMatch(await txt('#bTags'), /Web sitesi/); assert.match(await txt('#biz'), /Kaynak: Google Haritalar/);
 assert.equal(await page.locator('#brBtn').count(), 0); ok('site hizmeti izleri yok (site rozeti, broşür); Google kaynak belirtimi var');
+assert.equal(await txt('#bTags .tag.cat'), 'Kuaför'); assert.doesNotMatch(await txt('#bTags'), /Arama: kuaför/); ok('kartta Google kategorisi görünür (aranan sektörle aynıysa tekrar yazılmaz)');
 assert.match(await txt('#n_whatsapp'), /2/); assert.match(await txt('#n_call'), /1/); assert.match(await txt('#n_followup'), /1/);
 assert.equal(await txt('#n_lists'), '4'); ok('liste sayaçları 2/1/1, toplam rozet 4');
 assert.equal(await txt('#weekCount'), '7'); ok('haftalık sayaç sunucudan');
@@ -138,6 +139,7 @@ assert.equal(await vis('#toCallList'), false); ok('arama listesine alınan cep n
 await page.click('#skip'); await page.waitForFunction(() => document.getElementById('bName').textContent === 'Sabit Diş');
 assert.ok((await calls()).some(c => c[0] === 'release_business')); ok('atla sonraki kartı getirir ve kilidi bırakır');
 assert.equal(await page.locator('#waBtn').isDisabled(), true); assert.equal(await vis('#btnWaSent'), false); ok('sabit hatta WhatsApp kapalı');
+assert.equal(await txt('#bTags .tag.cat'), 'Diş hekimi'); assert.match(await txt('#bTags'), /Arama: diş/); ok('kategori ile aranan sektör farklıysa ikisi de görünür');
 await page.click('[data-o="callback"]'); assert.equal(await vis('#cbBox'), true);
 await page.fill('#note', 'sabah arayın'); await page.click('#cbSave');
 await page.waitForFunction(() => !document.getElementById('empty').classList.contains('hide'));
@@ -227,7 +229,7 @@ await page.route('**/functions/v1/scan', async route => {
   }
   if (scanMode === 'slow') await new Promise(r => setTimeout(r, 400));
   if (scanMode === 'fail' && b.district === 'Yenimahalle') return J(429, { error: 'daily_limit', message: 'Günlük Google çağrı sınırına ulaşıldı (60). Yarın devam edin.' });
-  return J(200, { city: b.city, district: b.district, sector: b.sector, found: 60, matched: 33, saved: 31, calls: 3, reasons: { 'bölge dışı': 18, 'telefon yok/geçersiz': 7, 'kapalı': 2 }, warning: null, used: 6, limit: 60 });
+  return J(200, { city: b.city, district: b.district, sector: b.sector, found: 60, matched: 33, saved: 31, calls: 3, reasons: { 'bölge dışı': 18, 'telefon yok/geçersiz': 7, 'kapalı': 2, 'kategori uygun değil': 1 }, warning: null, used: 6, limit: 60 });
 });
 
 await page.click('[data-nav="scan"]'); await page.waitForSelector('#scanView:not(.hide)');
@@ -261,7 +263,7 @@ await page.click('#scRun'); await page.waitForFunction(() => document.getElement
 await shot('10-tarama-bitti');
 const runs = scanCalls.filter(c => c.action === 'run'); assert.deepEqual(runs.map(r => r.district), ['Keçiören', 'Yenimahalle']); assert.equal(runs[0].city, 'Ankara'); assert.equal(runs[0].force, false);
 assert.match(await txt('#scLog'), /62 yeni kaydedildi, 6 Google çağrısı/);
-assert.match(await txt('#scLog'), /Elenen: 18 başka ilçe\/şehirde · 7 telefonu yok · 2 kapalı · 2 zaten listede/);
+assert.match(await txt('#scLog'), /Elenen: 18 başka ilçe\/şehirde · 7 telefonu yok · 2 kapalı · 1 otopark\/durak gibi işletme olmayan yer · 2 zaten listede/);
 assert.match(await txt('#scLog .sum'), /Elenen: 36 başka ilçe\/şehirde · 14 telefonu yok · 4 kapalı/); assert.equal(await vis('#scProg'), false); assert.equal(await page.locator('#scCity').isDisabled(), false); ok('tarama sırayla çalışır, özet ve eleme sebepleri yazılır, form tekrar açılır');
 // isteğe bağlı filtreler
 await page.click('#scFilters summary'); await page.selectOption('#fMinRating', '4.3'); await page.fill('#fMinRev', '10'); await page.fill('#fMaxRev', '300');

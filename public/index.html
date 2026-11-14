@@ -127,6 +127,7 @@
   .tag{display:inline-flex;align-items:center;gap:5px;font-weight:600}
   .tag+.tag::before{content:"";width:3px;height:3px;border-radius:50%;background:var(--mute);margin-right:9px}
   .tag.star{color:var(--ink);font-weight:800} .tag.star svg{color:var(--navy)}
+  .tag.cat{color:var(--navy);font-weight:800}
   .tag svg{width:13px;height:13px}
   .contact{margin-top:20px;padding:18px;border-radius:12px;background:var(--surface)}
   .phone{display:block;font-size:31px;font-weight:800;letter-spacing:-.035em;color:var(--ink);font-variant-numeric:tabular-nums}
@@ -1036,8 +1037,9 @@ async function renderBiz(pick, my){
   const [sc, sl] = scoreView(pick.lead_score), sbox = $('bScore');
   sbox.className = 'score '+sc; sbox.firstElementChild.textContent = pick.lead_score; sbox.lastElementChild.textContent = sl;
   const tags=$('bTags'); tags.replaceChildren();
+  if(pick.category) addTag(tags, pick.category, 'cat');                 // Google kategorisi: "Özel hastane", "Diş hekimi"…
   if(pick.rating != null) addTag(tags, `${String(pick.rating).replace('.',',')} (${pick.review_count ?? 0} yorum)`, 'star', STAR);
-  if(pick.sector) addTag(tags, pick.sector);
+  if(pick.sector && trLower(pick.sector) !== trLower(pick.category)) addTag(tags, 'Arama: '+pick.sector);
   addTag(tags, [pick.city,pick.district].filter(Boolean).join(' / '));
   const ph=$('bPhone'); ph.textContent = pick.phone_raw; ph.href = 'tel:'+(pick.phone_normalized||''); $('callBtn').href = ph.href;
   setupWa(pick);
@@ -1691,7 +1693,7 @@ $('scRun').onclick = async ()=>{
   await Promise.all([loadScanHistory(), loadFilters(), refreshCounts()]);
 };
 // Eleme sebepleri: "Elenen: 18 bölge dışı · 11 telefonu yok · 2 kapalı" (çoktan aza)
-const WHY_TR = {'bölge dışı':'başka ilçe/şehirde','telefon yok/geçersiz':'telefonu yok','kapalı':'kapalı','puan düşük':'puanı düşük','yorum az':'yorumu az',
+const WHY_TR = {'kategori uygun değil':'otopark/durak gibi işletme olmayan yer','bölge dışı':'başka ilçe/şehirde','telefon yok/geçersiz':'telefonu yok','kapalı':'kapalı','puan düşük':'puanı düşük','yorum az':'yorumu az',
   'yorum fazla':'yorumu fazla','çalışma saati yok':'çalışma saati bilinmiyor','istenen günde kapalı':'seçilen günde kapalı','ad yok':'adı eksik'};
 function whyText(reasons){
   const e = Object.entries(reasons||{}).filter(([,n])=>n>0).sort((a,b)=>b[1]-a[1]);
