@@ -227,7 +227,7 @@ await page.route('**/functions/v1/scan', async route => {
   }
   if (scanMode === 'slow') await new Promise(r => setTimeout(r, 400));
   if (scanMode === 'fail' && b.district === 'Yenimahalle') return J(429, { error: 'daily_limit', message: 'Günlük Google çağrı sınırına ulaşıldı (60). Yarın devam edin.' });
-  return J(200, { city: b.city, district: b.district, sector: b.sector, found: 60, matched: 31, saved: 31, calls: 3, reasons: {}, warning: null, used: 6, limit: 60 });
+  return J(200, { city: b.city, district: b.district, sector: b.sector, found: 60, matched: 33, saved: 31, calls: 3, reasons: { 'bölge dışı': 18, 'telefon yok/geçersiz': 7, 'kapalı': 2 }, warning: null, used: 6, limit: 60 });
 });
 
 await page.click('[data-nav="scan"]'); await page.waitForSelector('#scanView:not(.hide)');
@@ -248,7 +248,9 @@ ok('plan: taranacak/atlanacak ayrımı, günlük sınır uyarısı, oturum bilgi
 await page.click('#scRun'); await page.waitForFunction(() => document.getElementById('scLog').textContent.includes('Özet'));
 await shot('10-tarama-bitti');
 const runs = scanCalls.filter(c => c.action === 'run'); assert.deepEqual(runs.map(r => r.district), ['Keçiören', 'Yenimahalle']); assert.equal(runs[0].city, 'Ankara'); assert.equal(runs[0].force, false);
-assert.match(await txt('#scLog'), /62 yeni kaydedildi, 6 Google çağrısı/); assert.equal(await vis('#scProg'), false); assert.equal(await page.locator('#scCity').isDisabled(), false); ok('tarama sırayla çalışır, özet yazılır, form tekrar açılır');
+assert.match(await txt('#scLog'), /62 yeni kaydedildi, 6 Google çağrısı/);
+assert.match(await txt('#scLog'), /Elenen: 18 başka ilçe\/şehirde · 7 telefonu yok · 2 kapalı · 2 zaten listede/);
+assert.match(await txt('#scLog .sum'), /Elenen: 36 başka ilçe\/şehirde · 14 telefonu yok · 4 kapalı/); assert.equal(await vis('#scProg'), false); assert.equal(await page.locator('#scCity').isDisabled(), false); ok('tarama sırayla çalışır, özet ve eleme sebepleri yazılır, form tekrar açılır');
 // isteğe bağlı filtreler
 await page.click('#scFilters summary'); await page.selectOption('#fMinRating', '4.3'); await page.fill('#fMinRev', '10'); await page.fill('#fMaxRev', '300');
 await page.click('#fDays .chip:text-is("Cmt")'); assert.match(await txt('#fltSum'), /4 filtre/); assert.equal(await vis('#scPlanWrap'), false);

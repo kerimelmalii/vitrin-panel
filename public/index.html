@@ -277,6 +277,7 @@
   .log{margin-top:14px;font-size:14px}
   .log div{padding:9px 2px;border-bottom:1px solid var(--line)} .log div:last-child{border-bottom:0}
   .log .sum{font-weight:800;font-size:15px}
+  .log .why{font-size:12.5px;color:var(--mute);font-weight:500;margin-top:2px}
 
   /* ---------- giriş ve durum ekranları ---------- */
   #login,#gate{max-width:420px;margin:8vh auto 0;text-align:center;padding:36px 20px;border:0}
@@ -1626,7 +1627,8 @@ $('scRun').onclick = async ()=>{
   scanBusy=true; scanStop=false; setScanLocked(true);
   $('scPlanWrap').classList.add('hide'); $('scProg').classList.remove('hide'); $('scStop').disabled=false; $('scLog').replaceChildren();
   let saved=0, found=0, done=0, calls=0, stopReason='';
-  const logLine=(t,cls)=>{ $('scLog').appendChild(el('div',cls,t)); };
+  const allReasons={};
+  const logLine=(t,cls,sub)=>{ const d=el('div',cls,t); if(sub) d.appendChild(el('div','why',sub)); $('scLog').appendChild(d); };
   for(const u of units){
     if(scanStop){ stopReason='Durduruldu.'; break; }
     $('scProgTitle').textContent = `Taranıyor · ${done+1}/${units.length}`;
@@ -1635,17 +1637,26 @@ $('scRun').onclick = async ()=>{
       const r = await callScan({ action:'run', city:scanPlan.city, district:u.district, sector:u.sector, force, filters });
       if(r.skipped){ logLine(`${unitLabel(u)}: ${r.message}`,'muted'); }
       else { saved+=r.saved; found+=r.found; calls+=r.calls; if(r.quota) renderScanQuota(r.quota);
-        logLine(`${unitLabel(u)}: ${r.found} bulundu, ${r.matched} uygun, ${r.saved} yeni kaydedildi`+(r.warning?' ('+r.warning+')':''), r.saved?'ok':'muted');
+        Object.entries(r.reasons||{}).forEach(([k,n])=>{ allReasons[k]=(allReasons[k]||0)+n; });
+        const dup = r.matched - r.saved, why = [whyText(r.reasons), dup>0 && !/kota/i.test(r.warning||'') ? `${dup} zaten listede` : ''].filter(Boolean).join(' · ');
+        logLine(`${unitLabel(u)}: ${r.found} bulundu, ${r.matched} uygun, ${r.saved} yeni kaydedildi`+(r.warning?' ('+r.warning+')':''), r.saved?'ok':'muted', why);
         if(r.quota && r.quota.left===0){ stopReason='Aylık kota doldu.'; done++; break; } }
     }catch(e){ logLine(`${unitLabel(u)}: ${e.message}`,'bad'); stopReason='Hata nedeniyle durdu.'; break; }
     done++; $('scBar').style.width = Math.round(done/units.length*100)+'%';
   }
   scanBusy=false; setScanLocked(false);
   $('scProg').classList.add('hide'); $('scBar').style.width='0';
-  logLine(`${stopReason?stopReason+' ':''}Özet: ${found} bulundu, ${saved} yeni kaydedildi, ${calls} Google çağrısı.`, 'sum ok');
+  logLine(`${stopReason?stopReason+' ':''}Özet: ${found} bulundu, ${saved} yeni kaydedildi, ${calls} Google çağrısı.`, 'sum ok', units.length>1 ? whyText(allReasons) : '');
   resetScanPlan(); toast(saved?`${saved} yeni işletme eklendi`:'Yeni işletme eklenmedi');
   await Promise.all([loadScanHistory(), loadFilters(), refreshCounts()]);
 };
+// Eleme sebepleri: "Elenen: 18 bölge dışı · 11 telefonu yok · 2 kapalı" (çoktan aza)
+const WHY_TR = {'bölge dışı':'başka ilçe/şehirde','telefon yok/geçersiz':'telefonu yok','kapalı':'kapalı','puan düşük':'puanı düşük','yorum az':'yorumu az',
+  'yorum fazla':'yorumu fazla','çalışma saati yok':'çalışma saati bilinmiyor','istenen günde kapalı':'seçilen günde kapalı','ad yok':'adı eksik'};
+function whyText(reasons){
+  const e = Object.entries(reasons||{}).filter(([,n])=>n>0).sort((a,b)=>b[1]-a[1]);
+  return e.length ? 'Elenen: ' + e.map(([k,n])=>`${n} ${WHY_TR[k]||k}`).join(' · ') : '';
+}
 $('scStop').onclick = ()=>{ scanStop=true; $('scStop').disabled=true; $('scProgTxt').textContent='Durduruluyor (bu bölge bitince)…'; };
 
 async function loadScanHistory(){

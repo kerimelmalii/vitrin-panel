@@ -53,15 +53,20 @@ export function trTitle(s: string): string {
   }).join(" ");
 }
 
+/** Türkiye numarasını +90… biçimine çevirir. Cep, sabit hat, 444 çağrı merkezi ve 0850/0800 numaraları kabul edilir
+ *  (hastane, klinik zinciri, kurumsal şirketlerde asıl numara çoğu zaman 444/0850'dir; bunlar Arama listesine düşer). */
 export function normalizePhone(raw: string | null | undefined): string | null {
   let d = (raw ?? "").replace(/\D/g, "");
   if (d.startsWith("00")) d = d.slice(2);
+  const m444 = d.match(/^(?:90|0)?(444\d{4})$/);       // 444 1 234 (alan kodsuz 7 hane)
+  if (m444) return "+90" + m444[1];
   if (d.startsWith("90") && d.length === 12) { /* tamam */ }
   else if (d.startsWith("0") && d.length === 11) d = "90" + d.slice(1);
   else if (d.length === 10) d = "90" + d;
   else return null;
-  if (!"2345".includes(d[2])) return null;   // 0850/0800 gibi servis numaraları elenir
-  return "+" + d;
+  const area = d.slice(2, 5);
+  if ("2345".includes(d[2]) || area === "850" || area === "800") return "+" + d;
+  return null;                                           // 0900 vb. ücretli/özel numaralar elenir
 }
 
 export function isMobile(phone: string | null | undefined): boolean {
