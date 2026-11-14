@@ -80,7 +80,10 @@ assert.deepEqual(await page.evaluate(() => window.__signups.at(-1)), { email: 'd
 await shot('01b-kayit'); await axe('kayıt');
 await page.click('#toLogin'); assert.equal(await vis('#loginForm'), true); ok('kayıt ol: doğrulama, var olan e-posta uyarısı, başarılı kayıtta e-posta doğrulama mesajı');
 await page.fill('#email', 'a@b.com'); await page.fill('#password', 'yanlis'); await page.click('#loginForm button');
-await page.waitForFunction(() => document.getElementById('loginErr').textContent.length > 0); ok('yanlış şifre hata gösterir');
+await page.waitForFunction(() => document.getElementById('loginErr').textContent.length > 0); assert.match(await txt('#loginErr'), /şifre hatalı/); ok('yanlış şifre hata gösterir');
+await page.fill('#email', 'dogrulanmamis@b.com'); await page.click('#loginForm button');
+await page.waitForFunction(() => /doğrulanmadı/.test(document.getElementById('loginErr').textContent)); ok('doğrulanmamış e-postada açık uyarı');
+await page.fill('#email', 'a@b.com');
 await page.fill('#password', 'dogru'); await page.click('#loginForm button');
 await page.waitForSelector('#biz:not(.hide)'); ok('giriş sonrası kart geldi');
 

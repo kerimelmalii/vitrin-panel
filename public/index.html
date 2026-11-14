@@ -897,7 +897,12 @@ async function showApp(){
 $('loginForm').addEventListener('submit', async e=>{
   e.preventDefault(); $('loginErr').textContent='';
   const { error } = await sb.auth.signInWithPassword({ email:$('email').value.trim(), password:$('password').value });
-  error ? $('loginErr').textContent='E-posta veya şifre hatalı.' : showApp();
+  if(!error) return showApp();
+  const m = (error.code||'')+' '+(error.message||'');
+  $('loginErr').textContent = /not.?confirmed/i.test(m) ? 'E-posta adresiniz henüz doğrulanmadı. Gelen kutunuzdaki (ya da spam) doğrulama bağlantısına tıklayın.'
+    : /rate|too many/i.test(m) ? 'Çok fazla deneme. Biraz sonra tekrar deneyin.'
+    : /fetch|network/i.test(m) ? 'Sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edin.'
+    : 'E-posta veya şifre hatalı.';
 });
 $('logout').onclick = async ()=>{ await release(); await sb.auth.signOut(); showLogin(); };
 // Kayıt ol: hesap açılır ama rol/alan verilmeden hiçbir veri görünmez; Vitrin onaylar (Ekip/Yönetim)
