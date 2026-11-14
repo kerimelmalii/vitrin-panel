@@ -721,7 +721,7 @@ begin
   while exists (select 1 from public.workspaces where slug = s) loop i := i + 1; s := base || '-' || i; end loop;
   insert into public.workspaces (slug, name, is_demo, lead_quota, sector_suggestions)
   values (s, btrim(p_name), coalesce(p_is_demo, true), p_quota,
-          array['diş kliniği','poliklinik','tıp merkezi','fizik tedavi merkezi','göz kliniği','estetik kliniği',
+          array['özel hastane','diş kliniği','poliklinik','tıp merkezi','fizik tedavi merkezi','göz kliniği','estetik kliniği',
                 'psikolog','diyetisyen','eczane','laboratuvar','avukat','hukuk bürosu','mali müşavir','danışmanlık firması'])
   returning id into wid;
   return wid;
