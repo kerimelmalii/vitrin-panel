@@ -395,7 +395,8 @@ async function run(db: Db, env: Env, ctx: Ctx, f: Fetch, body: any, now: number)
     throw new UserError("quota", `Bu ayki işletme kotası doldu (${ctx.lead_quota}). Yeni ay başında devam edebilir ya da paketinizi büyütebilirsiniz.`, 429);
   }
   const left = env.MAX_CALLS_PER_DAY - used;
-  if (left <= 0) throw new UserError("daily_limit", `Günlük Google çağrı sınırına ulaşıldı (${env.MAX_CALLS_PER_DAY}). Yarın devam edin.`, 429);
+  // Mesaj müşteri şirkete de gider: çağrı sayısı gibi iç bilgi içermez (Vitrin, Yönetim sekmesinden görür)
+  if (left <= 0) throw new UserError("daily_limit", "Bugünkü tarama sınırına ulaşıldı. Yarın devam edebilirsiniz.", 429);
   if (!env.GOOGLE_API_KEY) throw new UserError("not_configured", "GOOGLE_API_KEY gizli anahtarı Supabase'de tanımlı değil.", 500);
 
   const query = [sector, district, city].filter(Boolean).join(" ");

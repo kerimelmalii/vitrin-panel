@@ -228,7 +228,7 @@ await page.route('**/functions/v1/scan', async route => {
       { district: 'Çankaya', sector: 'kuaför', status: 'recent' }, { district: 'Keçiören', sector: 'kuaför', status: 'scan' }, { district: 'Yenimahalle', sector: 'kuaför', status: 'scan' }, { district: 'Mamak', sector: 'kuaför', status: 'closed' }] });
   }
   if (scanMode === 'slow') await new Promise(r => setTimeout(r, 400));
-  if (scanMode === 'fail' && b.district === 'Yenimahalle') return J(429, { error: 'daily_limit', message: 'Günlük Google çağrı sınırına ulaşıldı (60). Yarın devam edin.' });
+  if (scanMode === 'fail' && b.district === 'Yenimahalle') return J(429, { error: 'daily_limit', message: 'Bugünkü tarama sınırına ulaşıldı. Yarın devam edebilirsiniz.' });
   return J(200, { city: b.city, district: b.district, sector: b.sector, found: 60, matched: 33, saved: 31, calls: 3, reasons: { 'bölge dışı': 18, 'telefon yok/geçersiz': 7, 'kapalı': 2, 'kategori uygun değil': 1 }, warning: null, used: 6, limit: 60 });
 });
 
@@ -275,7 +275,7 @@ assert.deepEqual(fr[0].filters, { min_rating: 4.3, min_reviews: 10, max_reviews:
 await page.uncheck('#scForce');
 scanMode = 'fail'; await page.click('#scPlan'); await page.waitForSelector('#scRun:not(.hide)'); await page.click('#scRun');
 await page.waitForFunction(() => document.getElementById('scLog').textContent.includes('Özet'));
-const logTxt = await txt('#scLog'); assert.match(logTxt, /Günlük Google çağrı sınırına ulaşıldı/); assert.match(logTxt, /Hata nedeniyle durdu/); assert.match(logTxt, /31 yeni kaydedildi/); ok('hata gelince durur, o ana kadarki sonuç korunur');
+const logTxt = await txt('#scLog'); assert.match(logTxt, /Bugünkü tarama sınırına ulaşıldı/); assert.match(logTxt, /Hata nedeniyle durdu/); assert.match(logTxt, /31 yeni kaydedildi/); ok('hata gelince durur, o ana kadarki sonuç korunur');
 scanMode = 'slow'; await page.click('#scPlan'); await page.waitForSelector('#scRun:not(.hide)'); await page.click('#scRun');
 await page.waitForSelector('#scProg:not(.hide)'); await page.click('#scStop');
 await page.waitForFunction(() => document.getElementById('scLog').textContent.includes('Özet'));
@@ -378,6 +378,8 @@ await ctx.close();
     body: JSON.stringify({ city: 'Ankara', usage: { used: 0, limit: 60 }, quota: { limit: 500, used: 500, left: 0 }, est_calls: 3, fits_today: 20, units: [{ district: '', sector: 'avukat', status: 'scan' }] }) }));
   await p.fill('#scCity', 'Ankara'); await p.fill('#scSectors', 'avukat'); await p.click('#scPlan'); await p.waitForSelector('#scPlanWrap:not(.hide)');
   assert.equal(await r.t.vis('#scRun'), false); assert.match(await r.t.txt('#scPlanBox'), /kotası doldu/); assert.match(await r.t.txt('#scQuota'), /Kota doldu/); ok('kota dolunca tarama başlatılamaz, açık uyarı');
+  assert.doesNotMatch(await r.t.txt('#scanView'), /çağrı|Google sınırı/i); assert.match(await r.t.txt('#scTiles'), /20\s*bugün taranabilir bölge/);
+  ok('müşteri şirkette Google çağrı sayıları görünmez (yalnızca Vitrin görür)');
   await p.click('[data-nav="team"]'); await p.waitForSelector('.trow');
   assert.equal(await p.locator('[data-nav="admin"]').isVisible(), false); assert.ok(!(await r.t.calls()).some(c => c[0] === 'admin_usage'));
   assert.equal(await p.locator('.trow').count(), 1); assert.doesNotMatch(await r.t.txt('#teamList'), /Kayıt:/); assert.match(await r.t.txt('#teamList'), /ali@pilot\.test/);

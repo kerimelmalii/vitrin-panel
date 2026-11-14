@@ -1642,21 +1642,24 @@ $('scPlan').onclick = async ()=>{
     const p = await callScan({ action:'plan', ...scanForm() });
     scanPlan = p; const force=$('scForce').checked, todo = unitsToRun(p, force).length;
     if(p.quota) renderScanQuota(p.quota);
-    const t=[[todo,'taranacak bölge'],[p.units.length-todo,'atlanacak'],[`${p.usage.used}/${p.usage.limit}`,'Google çağrısı (bugün)']];
+    // Google çağrı sayıları maliyetle ilgili iç bilgidir: yalnızca Vitrin (platform) alanında gösterilir
+    const internal = access.ws.isPlatform;
+    const t=[[todo,'taranacak bölge'],[p.units.length-todo,'atlanacak'],
+      internal ? [`${p.usage.used}/${p.usage.limit}`,'Google çağrısı (bugün)'] : [p.fits_today,'bugün taranabilir bölge']];
     tiles($('scTiles'), t);
-    const m=el('div','meter'), i=el('i'); i.style.width=Math.min(100,Math.round(p.usage.used/p.usage.limit*100))+'%'; m.appendChild(i); $('scTiles').lastChild.appendChild(m);
+    if(internal){ const m=el('div','meter'), i=el('i'); i.style.width=Math.min(100,Math.round(p.usage.used/p.usage.limit*100))+'%'; m.appendChild(i); $('scTiles').lastChild.appendChild(m); }
     const box=$('scPlanBox'); box.replaceChildren();
     p.units.forEach(u=>{ const d=el('div','u'); const run = u.status==='scan'||(force&&u.status==='recent');
       d.append(el('span',null,p.city+' / '+unitLabel(u)), el('span','pill '+(run?'ok':'neutral'), run && u.status==='recent' ? 'yeniden taranacak' : UNIT_TR[u.status])); box.appendChild(d); });
     $('scPlanWrap').classList.remove('hide');
     const run=$('scRun'); run.classList.toggle('hide', !todo);
-    run.textContent = `Taramayı başlat · ${todo} bölge, en çok ${todo*3} çağrı`;
+    run.textContent = `Taramayı başlat · ${todo} bölge` + (internal ? `, en çok ${todo*3} çağrı` : '');
     const quotaFull = p.quota && p.quota.left === 0;
     if(!todo) box.appendChild(el('div','muted','Taranacak bölge yok. Başka bölge/sektör deneyin ya da "yeniden tara"yı işaretleyin.'));
     else if(quotaFull) box.appendChild(el('div','bad','Bu ayki işletme kotası doldu. Yeni ay başında devam edebilir ya da paketinizi büyütebilirsiniz.'));
     else if(todo > p.fits_today) box.appendChild(el('div','warn',p.fits_today>0
-      ? `Günlük Google sınırı (${p.usage.limit}) nedeniyle bugün en çok ~${p.fits_today} bölge taranabilir; kalanını yarın tarayın.`
-      : 'Bugünkü Google çağrı sınırı doldu. Yarın devam edin.'));
+      ? (internal ? `Günlük Google sınırı (${p.usage.limit}) nedeniyle bugün` : 'Günlük tarama sınırı nedeniyle bugün') + ` en çok ~${p.fits_today} bölge taranabilir; kalanını yarın tarayın.`
+      : 'Bugünkü tarama sınırı doldu. Yarın devam edebilirsiniz.'));
     if(todo && (!p.fits_today || quotaFull)) run.classList.add('hide');
   }catch(e){ resetScanPlan(); toast(e.message); }
   finally{ $('scPlan').disabled=false; }
@@ -1688,7 +1691,7 @@ $('scRun').onclick = async ()=>{
   }
   scanBusy=false; setScanLocked(false);
   $('scProg').classList.add('hide'); $('scBar').style.width='0';
-  logLine(`${stopReason?stopReason+' ':''}Özet: ${found} bulundu, ${saved} yeni kaydedildi, ${calls} Google çağrısı.`, 'sum ok', units.length>1 ? whyText(allReasons) : '');
+  logLine(`${stopReason?stopReason+' ':''}Özet: ${found} bulundu, ${saved} yeni kaydedildi` + (access.ws.isPlatform ? `, ${calls} Google çağrısı.` : '.'), 'sum ok', units.length>1 ? whyText(allReasons) : '');
   resetScanPlan(); toast(saved?`${saved} yeni işletme eklendi`:'Yeni işletme eklenmedi');
   await Promise.all([loadScanHistory(), loadFilters(), refreshCounts()]);
 };
