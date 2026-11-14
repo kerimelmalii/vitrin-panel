@@ -229,7 +229,9 @@
   .trow .who{font-weight:800;overflow-wrap:anywhere} .trow .meta2{font-size:12.5px;color:var(--mute)}
   .trow .ctrl{display:grid;grid-template-columns:1fr 1fr auto;gap:8px}
   .trow .ctrl.ws{grid-template-columns:1fr 1fr 1fr auto}
-  @media (max-width:560px){.trow .ctrl,.trow .ctrl.ws{grid-template-columns:1fr 1fr}.trow .ctrl .btn{grid-column:1/-1}}
+  .trow .fld{min-width:0;display:flex;flex-direction:column} .trow .fld .lbl{font-size:11.5px;color:var(--mute);margin:0 0 4px}
+  .trow .fld .btn{margin-top:auto;min-height:48px}
+  @media (max-width:560px){.trow .ctrl,.trow .ctrl.ws{grid-template-columns:1fr 1fr}.trow .ctrl .fld:last-child{grid-column:1/-1}.trow .ctrl .fld:last-child .lbl{display:none}}
   .legend{display:grid;gap:10px;font-size:14px;color:var(--body)}
   .legend div{display:flex;gap:12px;align-items:baseline} .legend .pill{flex:none;min-width:96px;color:var(--ink)}
   .scan-h{display:flex;gap:14px;align-items:center;margin-bottom:18px}
@@ -895,7 +897,12 @@ async function showApp(){
 $('loginForm').addEventListener('submit', async e=>{
   e.preventDefault(); $('loginErr').textContent='';
   const { error } = await sb.auth.signInWithPassword({ email:$('email').value.trim(), password:$('password').value });
-  error ? $('loginErr').textContent='E-posta veya şifre hatalı.' : showApp();
+  if(!error) return showApp();
+  const m = (error.code||'')+' '+(error.message||'');
+  $('loginErr').textContent = /not.?confirmed/i.test(m) ? 'E-posta adresiniz henüz doğrulanmadı. Gelen kutunuzdaki (ya da spam) doğrulama bağlantısına tıklayın.'
+    : /rate|too many/i.test(m) ? 'Çok fazla deneme. Biraz sonra tekrar deneyin.'
+    : /fetch|network/i.test(m) ? 'Sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edin.'
+    : 'E-posta veya şifre hatalı.';
 });
 $('logout').onclick = async ()=>{ await release(); await sb.auth.signOut(); showLogin(); };
 // Kayıt ol: hesap açılır ama rol/alan verilmeden hiçbir veri görünmez; Vitrin onaylar (Ekip/Yönetim)
@@ -1415,11 +1422,15 @@ async function loadTeam(){
     if(plat && u.role==='none' && (u.company||u.phone)) who.appendChild(el('div','meta2', 'Kayıt: '+[u.full_name, u.company, u.phone].filter(Boolean).join(' · ')));
     const ctrl=el('div','ctrl'+(plat?' ws':'')); const name=el('input'); name.placeholder='Görünen ad'; name.value=u.display_name||u.full_name||''; name.setAttribute('aria-label','Görünen ad: '+(u.email||''));
     let wsSel=null;
-    if(plat){ wsSel=el('select'); wsSel.setAttribute('aria-label','Alan: '+(u.email||'')); workspaces.forEach(w=>wsSel.add(new Option(w.name, w.id))); wsSel.value = u.workspace_id || access.ws.id; }
+    if(plat){ wsSel=el('select'); wsSel.setAttribute('aria-label','Şirket: '+(u.email||''));
+      // Onay bekleyen kişide şirket boş gelir: yanlışlıkla Vitrin'e (platform verisine) bağlanmasın
+      if(!u.workspace_id) wsSel.add(new Option('Şirket seçin…', ''));
+      workspaces.forEach(w=>wsSel.add(new Option(w.is_platform ? w.name+' (platform)' : w.name, w.id))); wsSel.value = u.workspace_id || ''; }
     const sel=el('select'); sel.setAttribute('aria-label','Rol: '+(u.email||''));
     [['none','Yetkisiz'],['sales','Satış'],['designer','Operasyon'],['admin','Yönetici']].forEach(([v,t])=>sel.add(new Option(t,v))); sel.value=u.role;
     const btn=el('button','btn sm','Kaydet'); btn.type='button';
     btn.onclick=async ()=>{
+      if(wsSel && !wsSel.value && sel.value!=='none'){ toast('Önce şirketini seçin'); wsSel.focus(); return; }
       if(sel.value==='none' && u.role!=='none' && !await confirmDlg('Yetki kaldırılsın mı?', `${u.email} artık hiçbir şeyi göremeyecek.`, 'Evet, kaldır')) return;
       btn.disabled=true;
       const args = { p_user:u.user_id, p_role:sel.value, p_name:name.value||null }; if(wsSel) args.p_workspace = wsSel.value;
@@ -1427,7 +1438,9 @@ async function loadTeam(){
       if(error){ toast('Kaydedilemedi: '+error.message); return; }
       toast('Yetki güncellendi'); loadTeam(); if(plat) loadPendingBadge();
     };
-    if(wsSel) ctrl.append(name, wsSel, sel, btn); else ctrl.append(name, sel, btn);
+    const field=(lbl, input)=>{ const d=el('div','fld'); d.append(el('span','lbl',lbl), input); return d; };
+    const bw=el('div','fld'); bw.append(el('span','lbl','\u00a0'), btn);
+    if(wsSel) ctrl.append(field('Görünen ad',name), field('Şirket',wsSel), field('Rol',sel), bw); else ctrl.append(field('Görünen ad',name), field('Rol',sel), bw);
     row.append(who, ctrl); box.appendChild(row);
   });
 }

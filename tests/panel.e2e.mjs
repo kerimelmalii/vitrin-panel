@@ -80,7 +80,10 @@ assert.deepEqual(await page.evaluate(() => window.__signups.at(-1)), { email: 'd
 await shot('01b-kayit'); await axe('kayıt');
 await page.click('#toLogin'); assert.equal(await vis('#loginForm'), true); ok('kayıt ol: doğrulama, var olan e-posta uyarısı, başarılı kayıtta e-posta doğrulama mesajı');
 await page.fill('#email', 'a@b.com'); await page.fill('#password', 'yanlis'); await page.click('#loginForm button');
-await page.waitForFunction(() => document.getElementById('loginErr').textContent.length > 0); ok('yanlış şifre hata gösterir');
+await page.waitForFunction(() => document.getElementById('loginErr').textContent.length > 0); assert.match(await txt('#loginErr'), /şifre hatalı/); ok('yanlış şifre hata gösterir');
+await page.fill('#email', 'dogrulanmamis@b.com'); await page.click('#loginForm button');
+await page.waitForFunction(() => /doğrulanmadı/.test(document.getElementById('loginErr').textContent)); ok('doğrulanmamış e-postada açık uyarı');
+await page.fill('#email', 'a@b.com');
 await page.fill('#password', 'dogru'); await page.click('#loginForm button');
 await page.waitForSelector('#biz:not(.hide)'); ok('giriş sonrası kart geldi');
 
@@ -271,6 +274,10 @@ assert.equal(await page.locator('.trow').count(), 4); assert.match(await txt('#t
 assert.equal(await vis('#wsAdminBox'), false); assert.equal(await page.locator('.trow:nth-child(1) select').count(), 2);
 assert.match(await txt('.trow:nth-child(3)'), /Kayıt: Deniz Kaya · Kaya Hukuk · 0532 000 00 00/); assert.equal(await page.inputValue('.trow:nth-child(3) input'), 'Deniz Kaya');
 await shot('11-ekip'); await axe('ekip'); ok('platform yöneticisi: herkes listelenir, alan seçimi var; kayıt olanın ad/şirket/telefonu görünür');
+assert.equal(await page.inputValue('.trow:nth-child(3) select >> nth=0'), ''); assert.match(await txt('.trow:nth-child(3)'), /Şirket[\s\S]*Rol/);
+await page.selectOption('.trow:nth-child(3) select >> nth=1', 'sales'); await page.click('.trow:nth-child(3) button');
+await page.waitForFunction(() => document.getElementById('toast').textContent.includes('Önce şirketini seçin')); assert.equal(await count('set_user_role'), 0);
+ok('onay bekleyen kişide şirket boş gelir; şirket seçmeden rol verilemez (Vitrin\'e yanlışlıkla bağlanmaz)');
 await page.selectOption('.trow:nth-child(3) select >> nth=0', 'w1'); await page.selectOption('.trow:nth-child(3) select >> nth=1', 'admin');
 await page.fill('.trow:nth-child(3) input', 'Ayşe'); await page.click('.trow:nth-child(3) button');
 await page.waitForFunction(() => document.getElementById('toast').textContent.includes('Yetki güncellendi'));

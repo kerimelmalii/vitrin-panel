@@ -230,6 +230,10 @@ end $$;
 -- Platform yöneticisi: alan açar, kullanıcıyı alana atar, kotayı değiştirir
 set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
 select public.create_workspace('Örnek Şirket A.Ş.', true, 250);
+do $$ begin
+  begin perform public.set_user_role('44444444-4444-4444-4444-444444444444', 'sales'); raise exception 'alansız kişi platforma atandı';
+  exception when raise_exception then if sqlerrm like 'alansız%' then raise; end if; end;
+end $$;
 select pg_temp.assert((select slug from public.workspaces where name = 'Örnek Şirket A.Ş.') = 'ornek-sirket-a-s', 'alan kısa adı üretildi');
 select public.set_user_role('44444444-4444-4444-4444-444444444444', 'sales', 'Ayşe', (select id from public.workspaces where slug = 'ornek-sirket-a-s'));
 select pg_temp.assert((select workspace_name from public.team_list() where user_id = '44444444-4444-4444-4444-444444444444') = 'Örnek Şirket A.Ş.', 'kullanıcı yeni alana atandı');

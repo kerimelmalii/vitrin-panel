@@ -132,7 +132,8 @@
   window.supabase = { createClient: () => ({
     auth: {
       getSession: async () => ({ data: { session: session() } }),
-      signInWithPassword: async ({ password }) => password === 'dogru' ? (window.__loggedIn = true, { error: null }) : { error: { message: 'bad' } },
+      signInWithPassword: async ({ email, password }) => /^dogrulanmamis@/.test(email) ? { error: { code: 'email_not_confirmed', message: 'Email not confirmed' } }
+        : password === 'dogru' ? (window.__loggedIn = true, { error: null }) : { error: { message: 'Invalid login credentials' } },
       signOut: async () => { window.__loggedIn = false; },
       signUp: async ({ email, options }) => { (window.__signups = window.__signups || []).push({ email, data: options && options.data });
         return /^var@/.test(email) ? { data: {}, error: { message: 'User already registered' } } : { data: { user: { id: 'n1' }, session: null }, error: null }; },
