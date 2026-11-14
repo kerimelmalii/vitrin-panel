@@ -30,15 +30,15 @@
   ],
   [
    "444 1 234",
-   null
+   "+904441234"
   ],
   [
    "0850 123 45 67",
-   null
+   "+908501234567"
   ],
   [
    "0800 123 45 67",
-   null
+   "+908001234567"
   ],
   [
    "0532 111 22",
@@ -51,6 +51,26 @@
   [
    null,
    null
+  ],
+  [
+   "0 444 12 34",
+   "+904441234"
+  ],
+  [
+   "+90 444 1 234",
+   "+904441234"
+  ],
+  [
+   "444 12 345",
+   null
+  ],
+  [
+   "0900 123 45 67",
+   null
+  ],
+  [
+   "0 (216) 444 00 00",
+   "+902164440000"
   ]
  ],
  "websites": [
@@ -190,6 +210,28 @@
     "nationalPhoneNumber": null
    },
    "why": "telefon yok/geçersiz"
+  },
+  {
+   "name": "444 çağrı merkezi numarası",
+   "city": "Ankara",
+   "district": "Çankaya",
+   "sector": "hastane",
+   "place": {
+    "nationalPhoneNumber": "444 1 234"
+   },
+   "ok": true,
+   "phone": "+904441234"
+  },
+  {
+   "name": "0850 numarası",
+   "city": "Ankara",
+   "district": "Çankaya",
+   "sector": "hastane",
+   "place": {
+    "nationalPhoneNumber": "0850 123 45 67"
+   },
+   "ok": true,
+   "phone": "+908501234567"
   },
   {
    "name": "kalıcı kapalı",
