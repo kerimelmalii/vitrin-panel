@@ -163,6 +163,33 @@ alter table public.customer_notes drop constraint if exists customer_notes_kind_
 alter table public.customer_notes add constraint customer_notes_kind_chk check (kind in ('note','stage','created','edit','sale'));
 create index if not exists customer_notes_idx on public.customer_notes (customer_id, created_at desc);
 
+-- ---------- Ödeme takibi (yalnızca Vitrin yöneticileri; müşteri şirketler göremez) ----------
+alter table public.workspaces add column if not exists monthly_fee numeric(12,2) not null default 0;   -- aylık ücret (TL)
+alter table public.workspaces drop constraint if exists workspaces_fee_chk;
+alter table public.workspaces add constraint workspaces_fee_chk check (monthly_fee >= 0);
+
+create table if not exists public.workspace_payments (
+  id           uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references public.workspaces(id) on delete cascade,
+  period       date not null,                         -- hangi ayın ödemesi (ayın 1'i)
+  amount       numeric(12,2) not null check (amount > 0),
+  paid_at      date not null default (now() at time zone 'Europe/Istanbul')::date,
+  method       text not null default 'havale' check (method in ('havale','kart','nakit','diger')),
+  note         text,
+  created_by   uuid,
+  created_at   timestamptz not null default now()
+);
+create index if not exists workspace_payments_idx on public.workspace_payments (workspace_id, period);
+
+-- Platform ayarları (tek satır): dolar kuru ve aylık sabit giderler (Vercel, Supabase…)
+create table if not exists public.platform_settings (
+  id                 boolean primary key default true check (id),
+  usd_try            numeric(10,4) not null default 41 check (usd_try > 0),
+  fixed_monthly_cost numeric(12,2) not null default 0 check (fixed_monthly_cost >= 0),
+  updated_at         timestamptz not null default now()
+);
+insert into public.platform_settings (id) values (true) on conflict do nothing;
+
 -- Satış kalemleri: hangi üründen kaç adet, toplam kaça
 create table if not exists public.customer_sales (
   id           uuid primary key default gen_random_uuid(),
@@ -328,6 +355,8 @@ alter table public.scan_history   enable row level security;
 alter table public.customers      enable row level security;
 alter table public.customer_notes enable row level security;
 alter table public.customer_sales enable row level security;
+alter table public.workspace_payments enable row level security;   -- politika yok: yalnızca fonksiyonlarla
+alter table public.platform_settings  enable row level security;
 
 drop policy if exists p_read on public.workspaces;
 create policy p_read on public.workspaces for select to authenticated
@@ -359,7 +388,10 @@ create policy p_read on public.customer_sales for select to authenticated
 
 revoke all on public.workspaces, public.user_roles, public.businesses, public.calls, public.closed_regions, public.scan_history,
   public.customers, public.customer_notes, public.customer_sales from anon, authenticated;
-grant select on public.workspaces, public.user_roles, public.businesses, public.calls, public.closed_regions, public.scan_history,
+revoke all on public.workspace_payments, public.platform_settings from anon, authenticated;
+grant select (id, slug, name, is_platform, is_demo, lead_quota, weekly_goal, wa_daily_limit, message_template, sector_suggestions, created_at)
+  on public.workspaces to authenticated;   -- aylık ücret sütunu müşteriye açılmaz
+grant select on public.user_roles, public.businesses, public.calls, public.closed_regions, public.scan_history,
   public.customers, public.customer_notes, public.customer_sales to authenticated;
 
 -- ---------- Liste mantığı (tek yerde) ----------
@@ -416,6 +448,10 @@ drop function if exists public.list_workspaces();
 drop function if exists public.create_workspace(text,boolean,int);
 drop function if exists public.update_workspace(uuid,jsonb);
 drop function if exists public.admin_usage(date);
+drop function if exists public.admin_billing(date);
+drop function if exists public.add_payment(uuid,date,numeric,date,text,text);
+drop function if exists public.delete_payment(uuid);
+drop function if exists public.set_platform_settings(jsonb);
 
 create or replace function public.next_business(p_list text, p_city text default null,
                                                 p_sector text default null, p_skip uuid[] default '{}')
@@ -740,10 +776,10 @@ begin
   if jsonb_typeof(p_patch) <> 'object' then raise exception 'Geçersiz istek'; end if;
   if not exists (select 1 from public.workspaces where id = p_ws) then raise exception 'Alan bulunamadı'; end if;
   for k in select jsonb_object_keys(p_patch) loop
-    if k not in ('name','weekly_goal','wa_daily_limit','message_template','sector_suggestions','is_demo','lead_quota') then
+    if k not in ('name','weekly_goal','wa_daily_limit','message_template','sector_suggestions','is_demo','lead_quota','monthly_fee') then
       raise exception 'Güncellenemeyen alan: %', k;
     end if;
-    if k in ('is_demo','lead_quota') and not plat then raise exception 'Paket ve kota ayarlarını yalnızca Vitrin değiştirebilir'; end if;
+    if k in ('is_demo','lead_quota','monthly_fee') and not plat then raise exception 'Paket ve kota ayarlarını yalnızca Vitrin değiştirebilir'; end if;
   end loop;
   if p_patch ? 'message_template' then
     tpl := btrim(coalesce(p_patch->>'message_template', ''));
@@ -764,7 +800,8 @@ begin
     message_template   = case when p_patch ? 'message_template' then tpl else message_template end,
     sector_suggestions = case when p_patch ? 'sector_suggestions' then sec else sector_suggestions end,
     is_demo            = case when p_patch ? 'is_demo' then (p_patch->>'is_demo')::boolean else is_demo end,
-    lead_quota         = case when p_patch ? 'lead_quota' then nullif(p_patch->>'lead_quota', '')::int else lead_quota end
+    lead_quota         = case when p_patch ? 'lead_quota' then nullif(p_patch->>'lead_quota', '')::int else lead_quota end,
+    monthly_fee        = case when p_patch ? 'monthly_fee' then coalesce(nullif(p_patch->>'monthly_fee', '')::numeric, 0) else monthly_fee end
    where id = p_ws;
 end $$;
 
@@ -1004,6 +1041,99 @@ begin
   return res;
 end $$;
 
+-- ---------- Ödemeler ve kazanç (yalnızca platform yöneticisi) ----------
+-- Seçilen ay için: şirket başına aylık ücret, tahsil edilen, kalan, Google maliyeti (TL) ve kazanç; toplamlar ve son 6 ay.
+create or replace function public.admin_billing(p_month date default null)
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare d date := coalesce(p_month, (now() at time zone 'Europe/Istanbul')::date); m date; m0 timestamptz; m1 timestamptz;
+        st public.platform_settings; res jsonb;
+begin
+  if not public.is_platform_admin() then raise exception 'Bu işlem için yetkiniz yok'; end if;
+  m := date_trunc('month', d::timestamp)::date;
+  m0 := m::timestamp at time zone 'Europe/Istanbul'; m1 := (m + interval '1 month')::timestamp at time zone 'Europe/Istanbul';
+  select * into st from public.platform_settings where id;
+  with w as (
+    select w.id, w.name, w.is_platform, w.is_demo, w.monthly_fee, w.created_at,
+           coalesce((select sum(api_calls) from public.scan_history h where h.workspace_id = w.id and h.scanned_at >= m0 and h.scanned_at < m1), 0) as api_calls,
+           coalesce((select sum(amount) from public.workspace_payments p where p.workspace_id = w.id and p.period = m), 0) as paid
+      from public.workspaces w
+  ), x as (
+    select w.*, round(w.api_calls * public.google_cost_per_call() * st.usd_try, 2) as google_cost,
+           case when w.is_platform then 'platform' when w.monthly_fee = 0 then 'free'
+                when w.paid >= w.monthly_fee then 'paid' when w.paid > 0 then 'partial' else 'unpaid' end as status
+      from w
+  )
+  select jsonb_build_object(
+    'month', to_char(m, 'YYYY-MM'), 'usd_try', st.usd_try, 'fixed_monthly_cost', st.fixed_monthly_cost,
+    'cost_per_call_usd', public.google_cost_per_call(),
+    'totals', (select jsonb_build_object(
+        'expected',    coalesce(sum(monthly_fee) filter (where not is_platform), 0),
+        'collected',   coalesce(sum(paid), 0),
+        'outstanding', coalesce(sum(greatest(monthly_fee - paid, 0)) filter (where not is_platform), 0),
+        'google_cost', coalesce(sum(google_cost), 0),
+        'fixed_cost',  st.fixed_monthly_cost,
+        'profit',      coalesce(sum(paid), 0) - coalesce(sum(google_cost), 0) - st.fixed_monthly_cost,
+        'paying',      count(*) filter (where status = 'paid'),
+        'unpaid',      count(*) filter (where status in ('unpaid','partial'))) from x),
+    'workspaces', coalesce((select jsonb_agg(jsonb_build_object(
+        'id', x.id, 'name', x.name, 'is_platform', x.is_platform, 'is_demo', x.is_demo, 'monthly_fee', x.monthly_fee,
+        'paid', x.paid, 'remaining', greatest(x.monthly_fee - x.paid, 0), 'api_calls', x.api_calls, 'google_cost', x.google_cost,
+        'profit', x.paid - x.google_cost, 'status', x.status,
+        'payments', coalesce((select jsonb_agg(jsonb_build_object('id', p.id, 'amount', p.amount, 'paid_at', p.paid_at, 'method', p.method, 'note', p.note)
+                                order by p.paid_at, p.created_at) from public.workspace_payments p where p.workspace_id = x.id and p.period = m), '[]'))
+        order by x.is_platform, x.name) from x), '[]'),
+    'history', coalesce((select jsonb_agg(jsonb_build_object('month', to_char(k.mm, 'YYYY-MM'),
+        'collected', coalesce((select sum(amount) from public.workspace_payments p where p.period = k.mm), 0),
+        'google_cost', round(coalesce((select sum(api_calls) from public.scan_history h
+                          where h.scanned_at >= k.mm::timestamp at time zone 'Europe/Istanbul'
+                            and h.scanned_at < (k.mm + interval '1 month')::timestamp at time zone 'Europe/Istanbul'), 0)
+                         * public.google_cost_per_call() * st.usd_try, 2)) order by k.mm desc)
+        from (select (m - make_interval(months => g))::date as mm from generate_series(0, 5) g) k), '[]')
+  ) into res;
+  return res;
+end $$;
+
+create or replace function public.add_payment(p_ws uuid, p_period date, p_amount numeric,
+    p_paid_at date default null, p_method text default 'havale', p_note text default null)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare pid uuid;
+begin
+  if not public.is_platform_admin() then raise exception 'Bu işlem için yetkiniz yok'; end if;
+  if not exists (select 1 from public.workspaces where id = p_ws and not is_platform) then raise exception 'Şirket bulunamadı'; end if;
+  if p_amount is null or p_amount <= 0 then raise exception 'Tutar sıfırdan büyük olmalı'; end if;
+  if coalesce(p_method, 'havale') not in ('havale','kart','nakit','diger') then raise exception 'Geçersiz ödeme yöntemi'; end if;
+  insert into public.workspace_payments (workspace_id, period, amount, paid_at, method, note, created_by)
+  values (p_ws, date_trunc('month', coalesce(p_period, (now() at time zone 'Europe/Istanbul')::date)::timestamp)::date, round(p_amount, 2),
+          coalesce(p_paid_at, (now() at time zone 'Europe/Istanbul')::date), coalesce(p_method, 'havale'),
+          left(nullif(btrim(p_note), ''), 300), auth.uid())
+  returning id into pid;
+  return pid;
+end $$;
+
+create or replace function public.delete_payment(p_id uuid)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_platform_admin() then raise exception 'Bu işlem için yetkiniz yok'; end if;
+  delete from public.workspace_payments where id = p_id;
+  if not found then raise exception 'Ödeme bulunamadı'; end if;
+end $$;
+
+create or replace function public.set_platform_settings(p_patch jsonb)
+returns void language plpgsql security definer set search_path = public as $$
+declare k text;
+begin
+  if not public.is_platform_admin() then raise exception 'Bu işlem için yetkiniz yok'; end if;
+  if jsonb_typeof(p_patch) <> 'object' then raise exception 'Geçersiz istek'; end if;
+  for k in select jsonb_object_keys(p_patch) loop
+    if k not in ('usd_try','fixed_monthly_cost') then raise exception 'Güncellenemeyen alan: %', k; end if;
+  end loop;
+  update public.platform_settings set
+    usd_try            = case when p_patch ? 'usd_try' then (p_patch->>'usd_try')::numeric else usd_try end,
+    fixed_monthly_cost = case when p_patch ? 'fixed_monthly_cost' then coalesce(nullif(p_patch->>'fixed_monthly_cost', '')::numeric, 0) else fixed_monthly_cost end,
+    updated_at = now()
+   where id;
+end $$;
+
 -- Fonksiyon yetkileri: anon hiçbirini çağıramaz
 revoke all on function public.next_business(text,text,text,uuid[]), public.release_business(uuid),
   public.move_to_call_list(uuid), public.log_call(uuid,text,text,timestamptz,text), public.list_counts(text,text),
@@ -1014,6 +1144,7 @@ revoke all on function public.next_business(text,text,text,uuid[]), public.relea
   public.add_sale(uuid,text,int,numeric), public.delete_sale(uuid), public.scan_context(uuid), public.purge_stale_leads(),
   public.monthly_report(date), public.list_workspaces(), public.create_workspace(text,boolean,int), public.update_workspace(uuid,jsonb),
   public.admin_usage(date), public.google_cost_per_call(),
+  public.admin_billing(date), public.add_payment(uuid,date,numeric,date,text,text), public.delete_payment(uuid), public.set_platform_settings(jsonb),
   public.has_perm(text), public.role_perms(text), public.stage_label(text), public.reason_label(text), public.my_ws(),
   public.is_platform_admin(), public.platform_ws(), public.ws_leads_this_month(uuid), public.tr_month_start(timestamptz)
   from public, anon, authenticated;
@@ -1025,7 +1156,8 @@ grant execute on function public.next_business(text,text,text,uuid[]), public.re
   public.set_customer_stage(uuid,text,text), public.add_customer_note(uuid,text), public.customer_timeline(uuid),
   public.add_sale(uuid,text,int,numeric), public.delete_sale(uuid), public.monthly_report(date),
   public.list_workspaces(), public.create_workspace(text,boolean,int), public.update_workspace(uuid,jsonb),
-  public.admin_usage(date), public.stage_label(text), public.reason_label(text), public.tr_month_start(timestamptz) to authenticated;
+  public.admin_usage(date), public.admin_billing(date), public.add_payment(uuid,date,numeric,date,text,text), public.delete_payment(uuid),
+  public.set_platform_settings(jsonb), public.stage_label(text), public.reason_label(text), public.tr_month_start(timestamptz) to authenticated;
 -- Politikalar ve görünümler bu fonksiyonları çağırdığı için giriş yapmış kullanıcıda çalışabilmeli
 grant execute on function public.has_perm(text), public.role_perms(text), public.my_ws(), public.is_platform_admin() to authenticated;
 grant execute on function public.ingest_businesses(uuid,jsonb), public.scan_context(uuid), public.purge_stale_leads() to service_role;

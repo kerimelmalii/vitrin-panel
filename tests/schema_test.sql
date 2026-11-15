@@ -366,6 +366,46 @@ do $$ begin
   begin perform public.admin_usage(); raise exception 'satış yönetim panelini gördü'; exception when raise_exception then if sqlerrm like 'satış%' then raise; end if; end;
 end $$;
 
+-- ===================== Ödeme takibi =====================
+set role authenticated;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+select public.update_workspace('99999999-0000-0000-0000-000000000001', '{"monthly_fee":"1000"}');
+select public.set_platform_settings('{"usd_try":"40","fixed_monthly_cost":"1800"}');
+select public.add_payment('99999999-0000-0000-0000-000000000001', current_date, 600, null, 'havale', 'Kasım ilk taksit');
+select pg_temp.assert((select x->>'status' from jsonb_array_elements(public.admin_billing()->'workspaces') x where x->>'name' = 'Pilot') = 'partial', 'kısmi ödeme');
+select pg_temp.assert((select (x->>'remaining')::numeric from jsonb_array_elements(public.admin_billing()->'workspaces') x where x->>'name' = 'Pilot') = 400, 'kalan 400');
+select public.add_payment('99999999-0000-0000-0000-000000000001', current_date, 400, current_date, 'kart', null);
+select pg_temp.assert((select x->>'status' from jsonb_array_elements(public.admin_billing()->'workspaces') x where x->>'name' = 'Pilot') = 'paid', 'tam ödendi');
+select pg_temp.assert((select jsonb_array_length(x->'payments') from jsonb_array_elements(public.admin_billing()->'workspaces') x where x->>'name' = 'Pilot') = 2, 'iki ödeme listelenir');
+select pg_temp.assert((public.admin_billing()->'totals'->>'collected')::numeric = 1000, 'tahsil edilen 1000');
+-- Vitrin'in bu ayki 2 Google çağrısı: 2 × 0,035 $ × 40 = 2,80 TL; kazanç = 1000 − 2,80 − 1800
+select pg_temp.assert((public.admin_billing()->'totals'->>'google_cost')::numeric = 2.80, 'Google maliyeti TL: ' || (public.admin_billing()->'totals'->>'google_cost'));
+select pg_temp.assert((public.admin_billing()->'totals'->>'profit')::numeric = 1000 - 2.80 - 1800, 'net kazanç');
+select pg_temp.assert((select x->>'status' from jsonb_array_elements(public.admin_billing()->'workspaces') x where x->>'name' = 'Örnek Şirket A.Ş.') = 'free', 'ücreti 0 olan şirket "free"');
+select pg_temp.assert((select x->>'status' from jsonb_array_elements(public.admin_billing()->'workspaces') x where (x->>'is_platform')::boolean) = 'platform', 'Vitrin platform');
+select pg_temp.assert(jsonb_array_length(public.admin_billing()->'history') = 6, 'son 6 ay');
+select pg_temp.assert((public.admin_billing((now() - interval '1 month')::date)->'totals'->>'collected')::numeric = 0, 'geçen ayın ödemesi yok');
+select public.delete_payment((select (y->>'id')::uuid from jsonb_array_elements(public.admin_billing()->'workspaces') x, jsonb_array_elements(x->'payments') y where y->>'method' = 'kart'));
+select pg_temp.assert((public.admin_billing()->'totals'->>'collected')::numeric = 600, 'ödeme silindi');
+do $$ begin
+  begin perform public.add_payment(public.my_ws(), current_date, 10); raise exception 'platforma ödeme'; exception when raise_exception then if sqlerrm like 'platforma%' then raise; end if; end;
+  begin perform public.add_payment('99999999-0000-0000-0000-000000000001', current_date, 0); raise exception 'sıfır ödeme'; exception when raise_exception then if sqlerrm like 'sıfır%' then raise; end if; end;
+  begin perform public.add_payment('99999999-0000-0000-0000-000000000001', current_date, 5, null, 'bitcoin'); raise exception 'geçersiz yöntem'; exception when raise_exception then if sqlerrm like 'geçersiz yöntem' then raise; end if; end;
+  begin perform public.set_platform_settings('{"usd_try":"0"}'); raise exception 'sıfır kur'; exception when check_violation then null; end;
+end $$;
+-- Müşteri şirket: ücret, ödeme ve ayarları göremez/değiştiremez
+set request.jwt.claim.sub = '55555555-5555-5555-5555-555555555555';
+do $$ begin
+  begin perform public.admin_billing(); raise exception 'pilot ödemeleri gördü'; exception when raise_exception then if sqlerrm like 'pilot%' then raise; end if; end;
+  begin perform public.add_payment(public.my_ws(), current_date, 1); raise exception 'pilot ödeme ekledi'; exception when raise_exception then if sqlerrm like 'pilot%' then raise; end if; end;
+  begin perform public.set_platform_settings('{"usd_try":"1"}'); raise exception 'pilot kuru değiştirdi'; exception when raise_exception then if sqlerrm like 'pilot%' then raise; end if; end;
+  begin perform public.update_workspace(public.my_ws(), '{"monthly_fee":"0"}'); raise exception 'pilot ücretini değiştirdi'; exception when raise_exception then if sqlerrm like 'pilot%' then raise; end if; end;
+  begin perform monthly_fee from public.workspaces; raise exception 'pilot ücret sütununu okudu'; exception when insufficient_privilege then null; end;
+  begin perform * from public.workspace_payments; raise exception 'pilot ödeme tablosunu okudu'; exception when insufficient_privilege then null; end;
+  begin perform * from public.platform_settings; raise exception 'pilot ayar tablosunu okudu'; exception when insufficient_privilege then null; end;
+end $$;
+select pg_temp.assert((select name from public.workspaces) = 'Pilot', 'pilot kendi alan adını hâlâ okuyabilir');
+
 -- Eski veri: durumu 'won' olup müşterisi olmayan işletme şema yeniden çalışınca müşteri olur
 reset role;
 update public.businesses set status = 'won' where name = 'Üçüncü';

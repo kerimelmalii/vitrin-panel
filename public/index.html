@@ -295,6 +295,18 @@
   .adm-row{display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding:13px 2px;border-bottom:1px solid var(--line)} .adm-row:last-child{border-bottom:0}
   .adm-row .t{font-weight:800;overflow-wrap:anywhere} .adm-row .s{font-size:13px;color:var(--mute)} .adm-row .r{text-align:right;font-size:13px;color:var(--mute);white-space:nowrap}
   .adm-row .r b{display:block;font-size:16px;color:var(--ink)}
+  .billset{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end;margin-top:14px}
+  @media (max-width:480px){.billset{grid-template-columns:1fr 1fr}.billset .btn{grid-column:1/-1}}
+  .bws{padding:14px 2px;border-top:1px solid var(--line)} .bws:first-child{margin-top:14px}
+  .bws-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start} .bws-top .t{font-weight:800;overflow-wrap:anywhere}
+  .bws .s{font-size:13px;color:var(--mute);margin-top:2px} .bws .s b{color:var(--ink)}
+  .bws .pays{list-style:none;margin:8px 0 0;padding:0;font-size:13px;color:var(--body)}
+  .bws .pays li{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:3px 0}
+  .bws .pays .x{border:0;background:none;color:var(--mute);font-size:16px;padding:2px 6px;border-radius:6px} .bws .pays .x:hover{color:var(--bad);background:var(--bad-bg)}
+  .bws .acts{display:flex;gap:6px 16px;flex-wrap:wrap;margin-top:8px}
+  .payform{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px;padding:12px;border-radius:12px;background:var(--surface)}
+  .payform .wide{grid-column:1/-1}
+  @media (max-width:480px){.payform{grid-template-columns:1fr 1fr}}
   .callout{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:14px 16px;border-radius:12px;background:var(--warn-bg);color:var(--warn);font-weight:700;font-size:14px;margin-bottom:12px}
 
   /* ---------- diyalog, bildirim, tanıtım ---------- */
@@ -615,6 +627,19 @@
         <div class="tiles four" id="admTiles"></div>
         <div class="tiles four" id="admTiles2" style="margin-top:0;border-top:0"></div>
         <p class="hint" id="admCostNote"></p>
+      </div>
+      <div class="section-t">Ödemeler ve kazanç</div>
+      <div class="card" id="billCard">
+        <div class="tiles four" id="billTiles" style="margin-top:0"></div>
+        <div class="tiles four" id="billTiles2" style="margin-top:0;border-top:0"></div>
+        <div class="billset">
+          <div><label for="bUsd">Dolar kuru (TL)</label><input id="bUsd" inputmode="decimal"></div>
+          <div><label for="bFixed">Aylık sabit gider (TL)</label><input id="bFixed" inputmode="decimal" placeholder="Vercel, Supabase…"></div>
+          <button class="btn sm" id="bSetSave">Kaydet</button>
+        </div>
+        <p class="hint">Kazanç = tahsil edilen − Google maliyeti − sabit giderler. Google maliyeti, şirketin o ayki çağrıları × çağrı başına ~0,035 $ × dolar kuru ile tahmin edilir.</p>
+        <div id="billWs"></div>
+        <details style="margin-top:12px"><summary style="cursor:pointer;font-size:13.5px;font-weight:700;color:var(--mute)">Son 6 ay</summary><ul class="list compact" id="billHist"></ul></details>
       </div>
       <div class="section-t">Şirketler</div>
       <div class="card" style="padding:6px 20px" id="admWs"></div>
@@ -1550,7 +1575,73 @@ async function loadAdmin(){
       + ` · ${NUM.format(x.actions)} işlem · ${NUM.format(x.scans)} tarama`,
     NUM.format(x.api_calls), 'Google çağrısı'));
   if(w.error) fail(w.error); else { workspaces = w.data||[]; renderWorkspaces(); }
+  loadBilling();
 }
+
+// ---- Ödemeler ve kazanç (yalnızca Vitrin) ----
+const PAY_STATUS = {paid:['ok','Ödendi'], partial:['warn','Kısmi ödendi'], unpaid:['bad','Ödenmedi'], free:['neutral','Ücretsiz']};
+const PAY_METHOD = {havale:'Havale/EFT', kart:'Kart', nakit:'Nakit', diger:'Diğer'};
+const today = () => dayStr(new Date());
+async function loadBilling(){
+  const { data:b, error } = await sb.rpc('admin_billing',{ p_month:$('admMonth').value });
+  if(error){ $('billCard').classList.add('hide'); console.error(error); return; }
+  $('billCard').classList.remove('hide');
+  const t=b.totals;
+  tiles($('billTiles'), [[TRY.format(t.expected),'beklenen gelir'],[TRY.format(t.collected),'tahsil edilen'],[TRY.format(t.outstanding),'bekleyen'],[TRY.format(t.profit),'net kazanç']]);
+  $('billTiles').lastChild.firstChild.classList.toggle('bad', t.profit < 0);
+  tiles($('billTiles2'), [[TRY2.format(t.google_cost),'Google maliyeti'],[TRY.format(t.fixed_cost),'sabit gider'],[t.paying,'ödeyen şirket'],[t.unpaid,'ödemeyen / kısmi']]);
+  if(document.activeElement!==$('bUsd')) $('bUsd').value = String(Number(b.usd_try)).replace('.',',');
+  if(document.activeElement!==$('bFixed')) $('bFixed').value = Number(b.fixed_monthly_cost) ? String(Number(b.fixed_monthly_cost)).replace('.',',') : '';
+  const box=$('billWs'); box.replaceChildren();
+  (b.workspaces||[]).filter(x=>!x.is_platform).forEach(x=>{
+    const row=el('div','bws'); const [cls,lbl]=PAY_STATUS[x.status]||['neutral',x.status];
+    const top=el('div','bws-top'); top.append(el('div','t',x.name+(x.is_demo?' · Demo':'')), el('span','pill '+cls,lbl)); row.appendChild(top);
+    const s1=el('div','s'); s1.append('Aylık ücret ', el('b',null,TRY.format(x.monthly_fee)), ' · ödenen ', el('b',null,TRY2.format(x.paid)),
+      x.remaining>0 ? ' · kalan ' : '', x.remaining>0 ? el('b',null,TRY2.format(x.remaining)) : '');
+    const s2=el('div','s'); s2.append(`Google ${TRY2.format(x.google_cost)} (${NUM.format(x.api_calls)} çağrı) · kazanç `, el('b',null,TRY2.format(x.profit)));
+    row.append(s1, s2);
+    if((x.payments||[]).length){ const ul=el('ul','pays');
+      x.payments.forEach(p=>{ const li=el('li'); li.append(el('span',null,`${fmtDay(p.paid_at)} · ${PAY_METHOD[p.method]||p.method} · ${TRY2.format(p.amount)}${p.note?' · '+p.note:''}`));
+        const del=el('button','x','×'); del.type='button'; del.setAttribute('aria-label',`Ödemeyi sil: ${x.name} ${TRY2.format(p.amount)}`);
+        del.onclick=async ()=>{ if(!await confirmDlg('Ödeme silinsin mi?', `${x.name}: ${TRY2.format(p.amount)} (${fmtDay(p.paid_at)}) silinecek.`, 'Evet, sil')) return;
+          const { error } = await sb.rpc('delete_payment',{ p_id:p.id }); if(error){ toast('Silinemedi: '+error.message); return; } toast('Ödeme silindi'); loadBilling(); };
+        li.appendChild(del); ul.appendChild(li); });
+      row.appendChild(ul); }
+    const acts=el('div','acts'); const addB=el('button','link','+ Ödeme ekle'), feeB=el('button','link','Aylık ücreti değiştir'); addB.type=feeB.type='button';
+    acts.append(addB, feeB); row.appendChild(acts);
+    const form=el('div','payform hide');
+    addB.onclick=()=>{ form.replaceChildren(); form.classList.remove('hide');
+      const amt=el('input'); amt.inputMode='decimal'; amt.placeholder='Tutar (TL)'; amt.value = x.remaining>0 ? String(x.remaining).replace('.',',') : ''; amt.setAttribute('aria-label','Ödeme tutarı: '+x.name);
+      const dt=el('input'); dt.type='date'; dt.value=today(); dt.setAttribute('aria-label','Ödeme tarihi');
+      const mt=el('select'); mt.setAttribute('aria-label','Ödeme yöntemi'); Object.entries(PAY_METHOD).forEach(([v,l])=>mt.add(new Option(l,v)));
+      const nt=el('input'); nt.placeholder='Not (isteğe bağlı, örn. fatura no)'; nt.className='wide'; nt.setAttribute('aria-label','Not'); nt.maxLength=300;
+      const ok=el('button','btn primary sm wide','Ödemeyi kaydet'); ok.type='button';
+      ok.onclick=async ()=>{ const a=parseMoney(amt.value); if(!a){ toast('Tutarı sayı olarak yazın'); amt.focus(); return; }
+        ok.disabled=true; const { error } = await sb.rpc('add_payment',{ p_ws:x.id, p_period:$('admMonth').value, p_amount:a, p_paid_at:dt.value||null, p_method:mt.value, p_note:nt.value||null }); ok.disabled=false;
+        if(error){ toast('Kaydedilemedi: '+error.message); return; } toast('Ödeme kaydedildi: '+x.name); loadBilling(); };
+      form.append(amt, dt, mt, nt, ok); amt.focus(); };
+    feeB.onclick=()=>{ form.replaceChildren(); form.classList.remove('hide');
+      const fee=el('input'); fee.inputMode='decimal'; fee.value=String(Number(x.monthly_fee)).replace('.',','); fee.setAttribute('aria-label','Aylık ücret: '+x.name); fee.className='wide';
+      const chips=el('div','chips wide'); [500,1000,2000].forEach(v=>{ const c=el('button','chip',TRY.format(v)); c.type='button'; c.onclick=()=>{ fee.value=String(v); }; chips.appendChild(c); });
+      const ok=el('button','btn primary sm wide','Ücreti kaydet'); ok.type='button';
+      ok.onclick=async ()=>{ const v=fee.value.trim()==='' ? 0 : parseMoney(fee.value); if(v==null){ toast('Ücreti sayı olarak yazın'); return; }
+        ok.disabled=true; const { error } = await sb.rpc('update_workspace',{ p_ws:x.id, p_patch:{ monthly_fee:String(v) } }); ok.disabled=false;
+        if(error){ toast('Kaydedilemedi: '+error.message); return; } toast('Aylık ücret güncellendi'); loadBilling(); };
+      form.append(fee, chips, ok); fee.focus(); };
+    row.appendChild(form); box.appendChild(row);
+  });
+  if(!box.children.length) box.appendChild(el('p','hint','Henüz müşteri şirket yok. Aşağıdaki Alanlar bölümünden açabilirsiniz.'));
+  const hl=$('billHist'); hl.replaceChildren();
+  (b.history||[]).forEach(h=>{ const [y,m]=h.month.split('-'); const li=el('li');
+    li.append(el('div','t',new Date(Number(y),Number(m)-1,1).toLocaleDateString('tr-TR',{month:'long',year:'numeric'})),
+              el('span','s',`tahsil ${TRY.format(h.collected)} · Google ${TRY2.format(h.google_cost)}`)); hl.appendChild(li); });
+}
+$('bSetSave').onclick = async ()=>{
+  const usd=parseMoney($('bUsd').value), fixed=$('bFixed').value.trim()==='' ? 0 : parseMoney($('bFixed').value);
+  if(!usd){ toast('Dolar kurunu sayı olarak yazın (örn. 41,5)'); return; } if(fixed==null){ toast('Sabit gideri sayı olarak yazın'); return; }
+  const { error } = await sb.rpc('set_platform_settings',{ p_patch:{ usd_try:String(usd), fixed_monthly_cost:String(fixed) } });
+  if(error){ toast('Kaydedilemedi: '+error.message); return; } toast('Kur ve sabit gider kaydedildi'); loadBilling();
+};
 
 // Paketler
 function openPkgs(){ $('pkgNote').classList.toggle('hide', !access.ws.isDemo); $('pkgDlg').showModal(); }
