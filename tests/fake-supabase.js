@@ -55,6 +55,22 @@
     { user_id: 'u4', email: 'ali@pilot.test', display_name: 'Ali', role: 'sales', workspace_id: 'w1', workspace_name: 'Pilot Şirket', last_sign_in_at: null },
   ];
   const needs = (perm, fn) => a => has(perm) ? fn(a) : deny();
+  // Ödeme takibi (yalnızca platform yöneticisi)
+  const fees = { w1: 1000 }, psettings = { usd_try: 41, fixed_monthly_cost: 0 };
+  const pays = [{ id: 'p0', ws: 'w1', amount: 600, paid_at: '2026-11-03', method: 'havale', note: 'ilk taksit' }];
+  const billing = () => {
+    const rows = workspaces.map(w => { const paid = pays.filter(p => p.ws === w.id).reduce((a, p) => a + p.amount, 0), fee = w.is_platform ? 0 : (fees[w.id] || 0);
+      const calls = w.id === 'w0' ? 30 : 12, gc = Math.round(calls * 0.035 * psettings.usd_try * 100) / 100;
+      return { id: w.id, name: w.name, is_platform: w.is_platform, is_demo: w.is_demo, monthly_fee: fee, paid, remaining: Math.max(fee - paid, 0), api_calls: calls, google_cost: gc,
+        profit: paid - gc, status: w.is_platform ? 'platform' : fee === 0 ? 'free' : paid >= fee ? 'paid' : paid > 0 ? 'partial' : 'unpaid',
+        payments: pays.filter(p => p.ws === w.id).map(p => ({ ...p })) }; });
+    const sum = f => rows.reduce((a, r) => a + f(r), 0), collected = sum(r => r.paid), gcost = sum(r => r.google_cost);
+    return { month: '2026-11', usd_try: psettings.usd_try, fixed_monthly_cost: psettings.fixed_monthly_cost, cost_per_call_usd: 0.035,
+      totals: { expected: sum(r => r.is_platform ? 0 : r.monthly_fee), collected, outstanding: sum(r => r.is_platform ? 0 : r.remaining), google_cost: gcost,
+        fixed_cost: psettings.fixed_monthly_cost, profit: collected - gcost - psettings.fixed_monthly_cost, paying: rows.filter(r => r.status === 'paid').length,
+        unpaid: rows.filter(r => ['unpaid', 'partial'].includes(r.status)).length },
+      workspaces: rows, history: [{ month: '2026-11', collected, google_cost: gcost }, { month: '2026-10', collected: 0, google_cost: 0 }] };
+  };
   const custOf = bid => customers.find(c => c.business_id === bid);
 
   const handlers = {
@@ -100,6 +116,10 @@
     create_customer: needs('customers_write', a => { const id = 'c' + (++seq); customers.unshift({ id, business_id: null, name: a.p_name, phone: a.p_phone, city: a.p_city, sector: a.p_sector, stage: 'contacted',
       next_step: null, next_step_at: null, stage_changed_at: now() }); addNote(id, 'created', a.p_note || 'Müşteri elle eklendi'); return id; }),
     team_list: needs('team', () => users.filter(u => ws.is_platform || u.workspace_id === ws.id).map(u => ws.is_platform ? { ...u } : { ...u, company: null, phone: null })),
+    admin_billing: a => (role === 'admin' && ws.is_platform) ? billing(a) : deny(),
+    add_payment: a => (role === 'admin' && ws.is_platform) ? (pays.push({ id: 'p' + (++seq), ws: a.p_ws, amount: a.p_amount, paid_at: a.p_paid_at, method: a.p_method, note: a.p_note }), 'p' + seq) : deny(),
+    delete_payment: a => (role === 'admin' && ws.is_platform) ? (pays.splice(pays.findIndex(p => p.id === a.p_id), 1), null) : deny(),
+    set_platform_settings: a => (role === 'admin' && ws.is_platform) ? (Object.assign(psettings, { usd_try: Number(a.p_patch.usd_try), fixed_monthly_cost: Number(a.p_patch.fixed_monthly_cost) }), null) : deny(),
     admin_usage: a => (role === 'admin' && ws.is_platform) ? { month: (a.p_month || '').slice(0, 7), cost_per_call: 0.035,
       totals: { api_calls: 42, scans: 14, leads: 62, actions: log.length + 9, wa_sent: 3, won: 1, sales_total: 8500, active_users: 2, users: users.length,
         pending: users.filter(u => u.role === 'none').length },
@@ -116,6 +136,7 @@
       if (a.p_ws === ws.id) { const p = a.p_patch;
         if ('name' in p) ws.name = p.name; if ('weekly_goal' in p) ws.weekly_goal = p.weekly_goal; if ('wa_daily_limit' in p) ws.wa_daily_limit = p.wa_daily_limit;
         if ('message_template' in p) ws.message_template = p.message_template; if ('sector_suggestions' in p) ws.sector_suggestions = p.sector_suggestions.map(s => s.toLowerCase()); }
+      if ('monthly_fee' in a.p_patch) fees[a.p_ws] = Number(a.p_patch.monthly_fee);
       const w = workspaces.find(x => x.id === a.p_ws); if (w && 'lead_quota' in a.p_patch) w.lead_quota = a.p_patch.lead_quota === '' ? null : Number(a.p_patch.lead_quota);
       if (w && 'is_demo' in a.p_patch) w.is_demo = a.p_patch.is_demo; return null; }),
   };
