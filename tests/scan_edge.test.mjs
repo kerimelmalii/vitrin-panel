@@ -114,7 +114,7 @@ test('plan: kapalı, yakın zamanda taranmış ve taranacak birimleri ayırır',
   const w = world({ closed: [{ city: 'Bursa', district: null }, { city: 'Ankara', district: 'Keçiören' }], history: [{ city: 'Ankara', district: 'Çankaya', sector: 'kuaför', scanned_at: recent }], usage: 7 });
   let j = await (await call(w, { action: 'plan', city: 'ankara', districts: 'çankaya,keçiören,yenimahalle', sectors: 'Kuaför' })).json();
   assert.deepEqual(j.units.map((u) => [u.district, u.sector, u.status]), [['Çankaya', 'kuaför', 'recent'], ['Keçiören', 'kuaför', 'closed'], ['Yenimahalle', 'kuaför', 'scan']]);
-  assert.equal(j.city, 'Ankara'); assert.equal(j.est_calls, 3); assert.deepEqual(j.usage, { used: 7, limit: 60 }); assert.equal(j.fits_today, 17);
+  assert.equal(j.city, 'Ankara'); assert.equal(j.est_calls, 3); assert.deepEqual(j.usage, { used: 7, limit: 60 }); assert.equal(j.fits_today, 1);
   assert.deepEqual(j.quota, { limit: null, used: 0, left: null });
   assert.ok(w.log.wsFilters.length && w.log.wsFilters.every(Boolean), 'geçmiş/kapalı bölge sorguları alana göre süzülmeli');
   j = await (await call(w, { action: 'plan', city: 'Bursa', districts: 'Nilüfer', sectors: 'kuaför' })).json();
@@ -130,7 +130,7 @@ test('run: filtre yoksa hepsini, filtreyle uyanları kaydeder; alana yazar, anah
   assert.equal(r.status, 200);
   assert.deepEqual([j.found, j.matched, j.saved, j.calls], [2, 2, 2, 1]);
   assert.equal(w.log.ingestWs, WS);
-  assert.deepEqual(w.log.history[0], { workspace_id: WS, user_id: 'u1', city: 'Ankara', district: 'Çankaya', sector: 'kuaför', places_found: 2, saved: 2, api_calls: 1 });
+  assert.deepEqual(w.log.history[0], { workspace_id: WS, user_id: 'u1', city: 'Ankara', district: 'Çankaya', area: '', sector: 'kuaför', places_found: 2, saved: 2, api_calls: 1 });
   assert.ok(!JSON.stringify(j).includes('sb_secret'));
   w = world();
   j = await (await call(w, { action: 'run', city: 'Ankara', district: 'Çankaya', sector: 'kuaför', filters: { min_rating: 4 } })).json();
@@ -138,6 +138,42 @@ test('run: filtre yoksa hepsini, filtreyle uyanları kaydeder; alana yazar, anah
   assert.deepEqual(j.reasons, { 'puan düşük': 1 });
   assert.equal(w.log.ingest[0][0].place_id, 'a');
   assert.equal((await call(world(), { action: 'run', city: 'Ankara', district: 'Çankaya', sector: 'kuaför', filters: { min_rating: 9 } })).status, 400);
+});
+
+test('mahalle mahalle tarama: plan bölgeleri, sorgu, tek sayfa, geçmişe yazılır', async () => {
+  const recent = new Date(Date.parse('2026-10-09T12:00:00Z') - 5 * 86400_000).toISOString();
+  let w = world({ history: [{ city: 'İstanbul', district: 'Ataşehir', area: 'Barbaros', sector: 'diş kliniği', scanned_at: recent }] });
+  let j = await (await call(w, { action: 'plan', city: 'istanbul', districts: 'Ataşehir, Kadıköy', sectors: 'diş kliniği',
+    areas: { 'ataşehir': ['Atatürk', 'barbaros', 'Atatürk'] } })).json();
+  assert.deepEqual(j.units.map((u) => [u.district, u.area, u.status, u.pages]),
+    [['Ataşehir', 'Atatürk', 'scan', 1], ['Ataşehir', 'Barbaros', 'recent', 1], ['Kadıköy', '', 'scan', 3]]);
+  assert.equal(j.est_calls, 4);
+  // seçilmeyen ilçeye mahalle, geçersiz ad ve çok fazla bölge reddedilir
+  assert.equal((await call(w, { action: 'plan', city: 'İstanbul', districts: 'Ataşehir', sectors: 'x1', areas: { 'Kadıköy': ['Moda'] } })).status, 400);
+  assert.equal((await call(w, { action: 'plan', city: 'İstanbul', districts: 'Ataşehir', sectors: 'x1', areas: { 'Ataşehir': ['<b>'] } })).status, 400);
+  const many = Array.from({ length: 101 }, (_, i) => 'Mahalle ' + i);
+  const r = await call(w, { action: 'plan', city: 'İstanbul', districts: 'Ataşehir', sectors: 'a1, b1, c1', areas: { 'Ataşehir': many } });
+  assert.equal(r.status, 400); assert.match((await r.json()).message, /en çok 300 bölge/);
+  // çalıştırma: sorguda mahalle adı, en çok 1 sayfa, geçmişe mahalle yazılır; aynı mahalle 90 gün atlanır
+  const full = { places: Array.from({ length: 20 }, (_, i) => ({ ...basePlace, id: 'p' + i, formattedAddress: 'Atatürk Mh, Ataşehir/İstanbul', nationalPhoneNumber: `053${i % 10} 111 22 3${i % 10}` })), nextPageToken: 't' };
+  w = world({ places: [full] }); let q = null; const inner = w.f;
+  const f = async (u, i) => { if (String(u).includes('places.googleapis')) q = JSON.parse(i.body).textQuery; return inner(u, i); };
+  j = await (await fn.handle(new Request('https://x/f', { method: 'POST', headers: { authorization: 'Bearer j' },
+    body: JSON.stringify({ action: 'run', city: 'İstanbul', district: 'Ataşehir', area: 'atatürk', sector: 'diş kliniği' }) }), ENV, f, Date.parse('2026-10-09T12:00:00Z'))).json();
+  assert.equal(q, 'diş kliniği Atatürk Mahallesi Ataşehir İstanbul'); assert.equal(j.calls, 1); assert.equal(w.log.google, 1);
+  assert.equal(w.log.history[0].area, 'Atatürk'); assert.equal(j.area, 'Atatürk');
+  w = world({ history: [{ city: 'İstanbul', district: 'Ataşehir', area: 'Atatürk', sector: 'diş kliniği', scanned_at: recent }] });
+  assert.equal((await (await call(w, { action: 'run', city: 'İstanbul', district: 'Ataşehir', area: 'Atatürk', sector: 'diş kliniği' })).json()).skipped, 'recent');
+  assert.equal((await (await call(w, { action: 'run', city: 'İstanbul', district: 'Ataşehir', sector: 'diş kliniği' })).json()).skipped, undefined, 'ilçenin tamamı ayrı sayılır');
+});
+
+test('günlük çağrı sınırı tanımlı değilse uygulanmaz', async () => {
+  const env = { ...ENV, MAX_CALLS_PER_DAY: null };
+  const w = world({ usage: 5000 });
+  const p = await (await call(w, { action: 'plan', city: 'Ankara', districts: 'Çankaya, Keçiören', sectors: 'kuaför' }, { env })).json();
+  assert.deepEqual(p.usage, { used: 5000, limit: null }); assert.equal(p.fits_today, 2);
+  const r = await call(w, { action: 'run', city: 'Ankara', district: 'Çankaya', sector: 'kuaför' }, { env });
+  assert.equal(r.status, 200); assert.equal((await r.json()).saved, 2);
 });
 
 test('run: aylık işletme kotası', async () => {
@@ -213,5 +249,6 @@ test('loadEnv', () => {
   const e = fn.loadEnv((k) => ({ SUPABASE_URL: 'https://x.supabase.co/', SUPABASE_SERVICE_ROLE_KEY: 'a', ALLOWED_ORIGINS: 'https://b.com, https://c.com', MAX_CALLS_PER_DAY: '5' })[k]);
   assert.equal(e.SUPABASE_URL, 'https://x.supabase.co'); assert.equal(e.MAX_CALLS_PER_DAY, 5);
   assert.deepEqual(e.ALLOWED_ORIGINS, ['https://panel.vitrinweb.com.tr', 'https://b.com', 'https://c.com']);
-  assert.equal(fn.loadEnv(() => undefined).MAX_CALLS_PER_DAY, 60);
+  assert.equal(fn.loadEnv(() => undefined).MAX_CALLS_PER_DAY, null);   // tanımlı değilse günlük sınır yok
+  assert.equal(fn.loadEnv((k) => ({ MAX_CALLS_PER_DAY: '0' })[k]).MAX_CALLS_PER_DAY, null);
 });

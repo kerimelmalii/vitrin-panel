@@ -98,7 +98,12 @@ Hiç işlenmemiş (aranmamış, yazılmamış) işletme kaydı 30 gün sonra lis
 3. Supabase > Edge Functions > **Secrets**: `GOOGLE_API_KEY` = Google Places anahtarınız.
 4. Google anahtarını Places API ile kısıtlayın; Google Cloud > Faturalama > **Bütçeler ve uyarılar** bölümünden bütçe uyarısı kurun.
 
-* **Günlük sınır:** her alan için günde en çok **60** Google çağrısı (≈20 bölge). Değiştirmek için `MAX_CALLS_PER_DAY` secret'ı.
+* **Günlük sınır:** varsayılan olarak **yok**. Bir alanın günlük Google çağrısını sınırlamak isterseniz `MAX_CALLS_PER_DAY` secret'ını ekleyin
+  (örn. 200). Maliyet frenini Google tarafında tutun: Google Cloud > API'ler ve Hizmetler > Places API (New) > **Kotalar**'dan günlük istek sınırı koyun.
+  Müşteri şirketlerin asıl sınırı aylık işletme kotasıdır.
+* **Mahalle mahalle tarama:** Google bir aramada en çok 60 sonuç verir. Tara'da ilçe seçince "Mahalle mahalle tara" çıkar; seçilen her mahalle ayrı aranır
+  (mahalle başına 1 çağrı, en çok 20 sonuç), böylece kalabalık ilçelerden çok daha fazla işletme gelir. Bir planda en çok 300 bölge olabilir.
+  Mahalle listesi `public/data/mahalle/<plaka>.json` (PTT verisi, bkz. `KAYNAK.txt`).
 * **Başka alan adı:** paneli başka adresten açacaksanız `ALLOWED_ORIGINS` secret'ına ekleyin (virgülle).
 * Aynı bölge+sektör **90 gün** tekrar taranmaz ("yeniden tara" ile zorlanır). Vitrin alanında Bursa kapalı bölgedir.
 * Her kayda 0–100 **öncelik** verilir (Google puanı, yorum sayısı, cep telefonu); liste yüksek öncelikliyi önce gösterir.

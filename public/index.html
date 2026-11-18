@@ -267,6 +267,8 @@
   details.flt .in{padding:0 0 14px}
   .days{display:flex;gap:6px;flex-wrap:wrap}
   .pickhead{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:12.5px;margin:10px 0 0}
+  .chips.picks .grp{flex-basis:100%;font-size:12px;font-weight:800;color:var(--mute);margin:6px 2px 0}
+  .chips.picks .grp:first-child{margin-top:0}
   .chips.picks{max-height:172px;overflow:auto;padding:8px;border:1px solid var(--line);border-radius:12px;margin-top:6px}
   details.tips ul{margin:0;padding-left:18px;font-size:13.5px;color:var(--body);display:grid;gap:8px}
   details.tips summary{color:var(--navy)}
@@ -563,6 +565,11 @@
           <div class="pickhead"><span class="muted" id="districtCount"></span><span><span class="muted" id="districtSel"></span> <button type="button" class="link hide" id="districtClear">Temizle</button></span></div>
           <div class="chips picks" id="districtChips" role="group" aria-label="İlçe seçimi"></div>
         </div>
+        <label class="chk hide" id="byAreaWrap"><input type="checkbox" id="scByArea"> <span>Mahalle mahalle tara <span class="muted" style="font-weight:500">(ilçe başına çok daha fazla işletme)</span></span></label>
+        <div id="areaPick" class="hide">
+          <div class="pickhead"><span class="muted" id="areaCount"></span><span><button type="button" class="link" id="areaAll">Tümünü seç</button> · <button type="button" class="link" id="areaNone">Temizle</button></span></div>
+          <div class="chips picks" id="areaChips" role="group" aria-label="Mahalle seçimi"></div>
+        </div>
         <div class="space"></div>
         <label for="scSectors">Sektörler <span class="muted" style="font-weight:500">(virgülle ayırın; aşağıdan seçin ya da kendiniz yazın)</span></label>
         <input id="scSectors" placeholder="diş kliniği, avukat" autocomplete="off">
@@ -591,7 +598,8 @@
             <ul>
               <li><b>Sektörü dar yazın.</b> "hastane" yerine "özel hastane", "tıp merkezi", "poliklinik", "diş kliniği", "fizik tedavi merkezi" gibi. Geniş adlar acil servis, otopark, laboratuvar gibi birimleri de getirir; bunların çoğunda telefon olmadığı için elenir.</li>
               <li><b>Birden fazla ilçeyi birlikte seçin.</b> Her ilçe ayrı taranır ve ilçe başına en çok 60 sonuç gelir. Komşu ilçeleri (örneğin Ataşehir ile Kadıköy, Ümraniye, Maltepe) aynı anda seçebilirsiniz.</li>
-              <li><b>Büyük şehirlerde ilçe ilçe tarayın.</b> İlçe seçmezseniz bütün şehir tek sorguda taranır ve yine en çok 60 sonuç gelir; ilçe ilçe taramak çok daha fazla işletme bulur.</li>
+              <li><b>Büyük şehirlerde ilçe ilçe tarayın.</b> İlçe seçmezseniz bütün şehir tek sorguda taranır ve Google en çok 60 sonuç verir; ilçe ilçe taramak çok daha fazla işletme bulur.</li>
+              <li><b>Bir ilçeden daha fazlası için mahalle mahalle tarayın.</b> Google bir aramada en çok 60 sonuç verir. "Mahalle mahalle tara"yı açtığınızda her mahalle ayrı aranır; kalabalık ilçelerde çok daha fazla işletme bulunur. Mahalle sayısı arttıkça tarama uzar, bu yüzden önce işletmelerin yoğun olduğu mahalleleri seçin.</li>
               <li><b>Aynı yeri tekrar taramayın.</b> Aynı ilçe ve sektör ikinci kez tarandığında sonuçların çoğu zaten listenizde olur. Kotanızı yeni ilçe ve sektörlere ayırın.</li>
             </ul>
           </div>
@@ -1664,15 +1672,50 @@ function renderDistrictChips(){
   $('districtCount').textContent = `${city}: ${all.length} ilçe`;
   all.forEach(n=>{ const b=el('button','chip',n); b.type='button'; b.onclick=()=>{ if(scanBusy) return;
     const cur=$('scDistricts').value.split(',').map(s=>s.trim()).filter(Boolean), i=cur.findIndex(x=>trLower(x)===trLower(n));
-    i>=0 ? cur.splice(i,1) : cur.push(n); $('scDistricts').value=cur.join(', '); syncDistrictChips(); resetScanPlan(); }; box.appendChild(b); });
+    i>=0 ? cur.splice(i,1) : cur.push(n); $('scDistricts').value=cur.join(', '); syncDistrictChips(); renderAreaChips(); resetScanPlan(); }; box.appendChild(b); });
   syncDistrictChips();
 }
 function syncDistrictChips(){ const cur=districtList(); let n=0;
   document.querySelectorAll('#districtChips .chip').forEach(c=>{ const on=cur.includes(trLower(c.textContent)); c.classList.toggle('on',on); c.setAttribute('aria-pressed',String(on)); if(on) n++; });
   $('districtSel').textContent = cur.length ? `${cur.length} ilçe seçili` : 'Hiç seçmezseniz bütün şehir taranır'; $('districtClear').classList.toggle('hide', !cur.length); }
 $('scCity').addEventListener('input', renderDistrictChips);
-$('scDistricts').addEventListener('input', syncDistrictChips);
-$('districtClear').onclick = ()=>{ $('scDistricts').value=''; syncDistrictChips(); resetScanPlan(); };
+// Mahalle mahalle tarama: il başına mahalle dosyası (/data/mahalle/<plaka>.json) yalnızca gerekince indirilir
+const CITY_CODE = {"Adana":"01","Adıyaman":"02","Afyonkarahisar":"03","Ağrı":"04","Aksaray":"68","Amasya":"05","Ankara":"06","Antalya":"07","Ardahan":"75","Artvin":"08","Aydın":"09","Balıkesir":"10","Bartın":"74","Batman":"72","Bayburt":"69","Bilecik":"11","Bingöl":"12","Bitlis":"13","Bolu":"14","Burdur":"15","Bursa":"16","Çanakkale":"17","Çankırı":"18","Çorum":"19","Denizli":"20","Diyarbakır":"21","Düzce":"81","Edirne":"22","Elazığ":"23","Erzincan":"24","Erzurum":"25","Eskişehir":"26","Gaziantep":"27","Giresun":"28","Gümüşhane":"29","Hakkari":"30","Hatay":"31","Iğdır":"76","Isparta":"32","İstanbul":"34","İzmir":"35","Kahramanmaraş":"46","Karabük":"78","Karaman":"70","Kars":"36","Kastamonu":"37","Kayseri":"38","Kırıkkale":"71","Kırklareli":"39","Kırşehir":"40","Kilis":"79","Kocaeli":"41","Konya":"42","Kütahya":"43","Malatya":"44","Manisa":"45","Mardin":"47","Mersin":"33","Muğla":"48","Muş":"49","Nevşehir":"50","Niğde":"51","Ordu":"52","Osmaniye":"80","Rize":"53","Sakarya":"54","Samsun":"55","Siirt":"56","Sinop":"57","Sivas":"58","Şanlıurfa":"63","Şırnak":"73","Tekirdağ":"59","Tokat":"60","Trabzon":"61","Tunceli":"62","Uşak":"64","Van":"65","Yalova":"77","Yozgat":"66","Zonguldak":"67"};
+const areaCache = {}; let areaSel = new Set();   // "İlçe|Mahalle"
+async function loadAreas(city){
+  if(areaCache[city]) return areaCache[city];
+  const r = await fetch('/data/mahalle/' + CITY_CODE[city] + '.json'); if(!r.ok) throw new Error('Mahalle listesi yüklenemedi');
+  return (areaCache[city] = await r.json());
+}
+const selDistricts = () => { const city=provinceOf($('scCity').value); const all=(DISTRICTS[city]||'').split('|');
+  return $('scDistricts').value.split(',').map(s=>s.trim()).filter(Boolean).map(x=>all.find(d=>trLower(d)===trLower(x))).filter(Boolean); };
+async function renderAreaChips(){
+  const city=provinceOf($('scCity').value), ds=selDistricts();
+  $('byAreaWrap').classList.toggle('hide', !city || !ds.length);
+  const on = $('scByArea').checked && city && ds.length; $('areaPick').classList.toggle('hide', !on);
+  if(!on) return;
+  let data; try{ data = await loadAreas(city); }catch(e){ toast(e.message); return; }
+  const box=$('areaChips'); box.replaceChildren(); const keep=new Set();
+  ds.forEach(d=>{ const names=(data[d]||[]).slice().sort((a,b)=>a.localeCompare(b,'tr'));
+    box.appendChild(el('span','grp', `${d} · ${names.length} mahalle`));
+    names.forEach(n=>{ const k=d+'|'+n; keep.add(k); const b=el('button','chip',n); b.type='button'; b.dataset.k=k;
+      b.onclick=()=>{ if(scanBusy) return; areaSel.has(k) ? areaSel.delete(k) : areaSel.add(k); syncAreaChips(); resetScanPlan(); }; box.appendChild(b); }); });
+  if(![...areaSel].some(k=>keep.has(k))) keep.forEach(k=>areaSel.add(k));   // ilk açılışta hepsi seçili
+  areaSel = new Set([...areaSel].filter(k=>keep.has(k))); syncAreaChips();
+}
+function syncAreaChips(){ let n=0;
+  document.querySelectorAll('#areaChips .chip').forEach(c=>{ const on=areaSel.has(c.dataset.k); c.classList.toggle('on',on); c.setAttribute('aria-pressed',String(on)); if(on) n++; });
+  $('areaCount').textContent = `${n} mahalle seçili` + (n>0 ? ` · sektör başına ${n} arama` : ' · seçilmeyen ilçenin tamamı taranır'); }
+function scanAreas(){
+  if(!$('scByArea').checked || $('areaPick').classList.contains('hide')) return undefined;
+  const out={}; areaSel.forEach(k=>{ const [d,n]=k.split('|'); (out[d]=out[d]||[]).push(n); }); return out;
+}
+$('scByArea').addEventListener('change', ()=>{ if(!$('scByArea').checked) areaSel.clear(); renderAreaChips(); resetScanPlan(); });
+$('areaAll').onclick = ()=>{ document.querySelectorAll('#areaChips .chip').forEach(c=>areaSel.add(c.dataset.k)); syncAreaChips(); resetScanPlan(); };
+$('areaNone').onclick = ()=>{ areaSel.clear(); syncAreaChips(); resetScanPlan(); };
+$('scDistricts').addEventListener('input', ()=>{ syncDistrictChips(); renderAreaChips(); });
+$('scCity').addEventListener('input', ()=>renderAreaChips());
+$('districtClear').onclick = ()=>{ $('scDistricts').value=''; syncDistrictChips(); renderAreaChips(); resetScanPlan(); };
 const sectorList = () => $('scSectors').value.split(',').map(s=>trLower(s.trim())).filter(Boolean);
 function syncSectorChips(){ const cur=sectorList(); document.querySelectorAll('#sectorChips .chip').forEach(c=>c.classList.toggle('on', cur.includes(trLower(c.textContent)))); }
 function renderSectorChips(){
@@ -1718,9 +1761,9 @@ async function callScan(body){
   return j;
 }
 const UNIT_TR = {scan:'taranacak', recent:'90 gün içinde taranmış', closed:'kapalı bölge'};
-const unitLabel = u => (u.district||'Tüm şehir')+' · '+u.sector;
-const scanForm = () => ({ city:$('scCity').value, districts:$('scDistricts').value, sectors:$('scSectors').value, filters:scanFilters() });
-const SCAN_INPUTS = ['scCity','scDistricts','scSectors','scForce','scPlan','fMinRating','fMinRev','fMaxRev'];
+const unitLabel = u => (u.district||'Tüm şehir') + (u.area ? ' / '+u.area+' Mah.' : '') + ' · ' + u.sector;
+const scanForm = () => ({ city:$('scCity').value, districts:$('scDistricts').value, sectors:$('scSectors').value, filters:scanFilters(), areas:scanAreas() });
+const SCAN_INPUTS = ['scCity','scDistricts','scSectors','scForce','scPlan','fMinRating','fMinRev','fMaxRev','scByArea'];
 const setScanLocked = on => SCAN_INPUTS.forEach(id=>$(id).disabled=on);
 function resetScanPlan(){ scanPlan=null; $('scPlanWrap').classList.add('hide'); $('scRun').classList.add('hide'); }
 ['scCity','scDistricts','scSectors','scForce'].forEach(id=>$(id).addEventListener('input',()=>{ if(id==='scSectors') syncSectorChips(); if(!scanBusy) resetScanPlan(); }));
@@ -1735,23 +1778,25 @@ $('scPlan').onclick = async ()=>{
     if(p.quota) renderScanQuota(p.quota);
     // Google çağrı sayıları maliyetle ilgili iç bilgidir: yalnızca Vitrin (platform) alanında gösterilir
     const internal = access.ws.isPlatform;
+    const limited = p.usage.limit != null, calls = unitsToRun(p, force).reduce((n,u)=>n+(u.pages||3),0);
     const t=[[todo,'taranacak bölge'],[p.units.length-todo,'atlanacak'],
-      internal ? [`${p.usage.used}/${p.usage.limit}`,'Google çağrısı (bugün)'] : [p.fits_today,'bugün taranabilir bölge']];
+      internal ? [limited ? `${p.usage.used}/${p.usage.limit}` : NUM.format(p.usage.used),'Google çağrısı (bugün)'] : [limited ? p.fits_today : NUM.format(todo),'bugün taranabilir bölge']];
     tiles($('scTiles'), t);
-    if(internal){ const m=el('div','meter'), i=el('i'); i.style.width=Math.min(100,Math.round(p.usage.used/p.usage.limit*100))+'%'; m.appendChild(i); $('scTiles').lastChild.appendChild(m); }
+    if(internal && limited){ const m=el('div','meter'), i=el('i'); i.style.width=Math.min(100,Math.round(p.usage.used/p.usage.limit*100))+'%'; m.appendChild(i); $('scTiles').lastChild.appendChild(m); }
     const box=$('scPlanBox'); box.replaceChildren();
-    p.units.forEach(u=>{ const d=el('div','u'); const run = u.status==='scan'||(force&&u.status==='recent');
+    const SHOW=40; p.units.slice(0,SHOW).forEach(u=>{ const d=el('div','u'); const run = u.status==='scan'||(force&&u.status==='recent');
       d.append(el('span',null,p.city+' / '+unitLabel(u)), el('span','pill '+(run?'ok':'neutral'), run && u.status==='recent' ? 'yeniden taranacak' : UNIT_TR[u.status])); box.appendChild(d); });
+    if(p.units.length>SHOW) box.appendChild(el('div','muted',`… ve ${p.units.length-SHOW} bölge daha`));
     $('scPlanWrap').classList.remove('hide');
     const run=$('scRun'); run.classList.toggle('hide', !todo);
-    run.textContent = `Taramayı başlat · ${todo} bölge` + (internal ? `, en çok ${todo*3} çağrı` : '');
+    run.textContent = `Taramayı başlat · ${todo} bölge` + (internal ? `, en çok ${calls} çağrı` : '');
     const quotaFull = p.quota && p.quota.left === 0;
     if(!todo) box.appendChild(el('div','muted','Taranacak bölge yok. Başka bölge/sektör deneyin ya da "yeniden tara"yı işaretleyin.'));
     else if(quotaFull) box.appendChild(el('div','bad','Bu ayki işletme kotası doldu. Yeni ay başında devam edebilir ya da paketinizi büyütebilirsiniz.'));
-    else if(todo > p.fits_today) box.appendChild(el('div','warn',p.fits_today>0
+    else if(limited && todo > p.fits_today) box.appendChild(el('div','warn',p.fits_today>0
       ? (internal ? `Günlük Google sınırı (${p.usage.limit}) nedeniyle bugün` : 'Günlük tarama sınırı nedeniyle bugün') + ` en çok ~${p.fits_today} bölge taranabilir; kalanını yarın tarayın.`
       : 'Bugünkü tarama sınırı doldu. Yarın devam edebilirsiniz.'));
-    if(todo && (!p.fits_today || quotaFull)) run.classList.add('hide');
+    if(todo && ((limited && !p.fits_today) || quotaFull)) run.classList.add('hide');
   }catch(e){ resetScanPlan(); toast(e.message); }
   finally{ $('scPlan').disabled=false; }
 };
@@ -1770,7 +1815,7 @@ $('scRun').onclick = async ()=>{
     $('scProgTitle').textContent = `Taranıyor · ${done+1}/${units.length}`;
     $('scProgTxt').textContent = `${scanPlan.city} / ${unitLabel(u)} · şu ana kadar ${saved} yeni`;
     try{
-      const r = await callScan({ action:'run', city:scanPlan.city, district:u.district, sector:u.sector, force, filters });
+      const r = await callScan({ action:'run', city:scanPlan.city, district:u.district, area:u.area||'', sector:u.sector, force, filters });
       if(r.skipped){ logLine(`${unitLabel(u)}: ${r.message}`,'muted'); }
       else { saved+=r.saved; found+=r.found; calls+=r.calls; if(r.quota) renderScanQuota(r.quota);
         Object.entries(r.reasons||{}).forEach(([k,n])=>{ allReasons[k]=(allReasons[k]||0)+n; });
@@ -1796,12 +1841,12 @@ function whyText(reasons){
 $('scStop').onclick = ()=>{ scanStop=true; $('scStop').disabled=true; $('scProgTxt').textContent='Durduruluyor (bu bölge bitince)…'; };
 
 async function loadScanHistory(){
-  const { data, error } = await sb.from('scan_history').select('city,district,sector,scanned_at,places_found,saved').order('scanned_at',{ascending:false}).limit(10);
+  const { data, error } = await sb.from('scan_history').select('city,district,area,sector,scanned_at,places_found,saved').order('scanned_at',{ascending:false}).limit(10);
   const ul=$('scHist'); ul.replaceChildren();
   if(error){ fail(error); return; }
   if(!(data||[]).length){ emptyLi(ul,'Henüz tarama yapılmadı.'); return; }
   data.forEach(h=>{ const li=el('li');
-    const left=el('div'); left.append(el('div','t',[h.city,h.district,h.sector].filter(Boolean).join(' · ')), el('div','s',`${fmt(h.scanned_at)} · ${h.places_found} bulundu`));
+    const left=el('div'); left.append(el('div','t',[h.city,h.district,h.area?h.area+' Mah.':'',h.sector].filter(Boolean).join(' · ')), el('div','s',`${fmt(h.scanned_at)} · ${h.places_found} bulundu`));
     li.append(left, el('span','pill '+(h.saved?'ok':'neutral'), `+${h.saved} yeni`)); ul.appendChild(li); });
 }
 
