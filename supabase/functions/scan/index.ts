@@ -5,7 +5,7 @@
 // Her alanın aylık işletme kotası (workspaces.lead_quota) ve günlük Google çağrı sınırı ayrı sayılır.
 //
 // Gerekli gizli anahtar : GOOGLE_API_KEY
-// Opsiyonel             : MAX_CALLS_PER_DAY (varsayılan 60), ALLOWED_ORIGINS (virgülle; varsayılan panel adresi),
+// Opsiyonel             : MAX_CALLS_PER_DAY (alan başına günlük Google çağrısı; tanımlı değilse sınır yok), ALLOWED_ORIGINS (virgülle; varsayılan panel adresi),
 //                         SCAN_SERVICE_KEY (platform service_role anahtarını sağlamıyorsa)
 // Otomatik gelenler     : SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 // Ortak test verisi: tests/scan_cases.json.
@@ -22,7 +22,10 @@ const FIELD_MASK = [
 ].join(",");
 export const RESCAN_DAYS = 90;
 const PAGE_SIZE = 20;
-const MAX_PAGES = 3;
+const MAX_PAGES = 3;          // ilçe/şehir sorgusu: en çok 3 sayfa × 20 = 60 sonuç (Google'ın sınırı)
+const MAX_PAGES_AREA = 1;     // mahalle sorgusu: 1 sayfa (20 sonuç); mahalleler zaten ilçeyi parçalara böler
+const MAX_UNITS = 300;        // bir planda en çok bölge (ilçe/mahalle × sektör)
+const pagesFor = (area: string) => area ? MAX_PAGES_AREA : MAX_PAGES;
 const DEFAULT_ALLOWED_ORIGINS = ["https://panel.vitrinweb.com.tr"];
 const SOCIAL_HOSTS = [
   "instagram.com", "facebook.com", "fb.com", "fb.me", "linktr.ee", "wa.me", "whatsapp.com",
@@ -161,10 +164,26 @@ export function regionClosed(closed: any[], city: string, district: string): boo
     (!c.district || trLower(c.district) === trLower(district)));
 }
 
-export function recentScan(history: any[], city: string, district: string, sector: string, now = Date.now()): any | null {
+export function recentScan(history: any[], city: string, district: string, sector: string, now = Date.now(), area = ""): any | null {
   const cutoff = now - RESCAN_DAYS * 86400_000;
   return history.find((h) => trLower(h.city) === trLower(city) && trLower(h.district ?? "") === trLower(district) &&
-    trLower(h.sector) === trLower(sector) && Date.parse(h.scanned_at) >= cutoff) ?? null;
+    trLower(h.area ?? "") === trLower(area) && trLower(h.sector) === trLower(sector) && Date.parse(h.scanned_at) >= cutoff) ?? null;
+}
+
+/** Mahalle listesi: { "Ataşehir": ["Atatürk", "Barbaros", …] }. Yalnızca seçilen ilçeler için, adlar doğrulanır. */
+export function cleanAreas(raw: unknown, districts: string[]): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  if (raw == null) return out;
+  if (typeof raw !== "object" || Array.isArray(raw)) throw new UserError("bad_area", "Mahalle listesi geçersiz.");
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    const d = districts.find((x) => trLower(x) === trLower(k));
+    if (!d) throw new UserError("bad_area", `Mahalle listesi seçilmeyen bir ilçe içeriyor: "${String(k).slice(0, 30)}"`);
+    if (!Array.isArray(v)) throw new UserError("bad_area", "Mahalle listesi geçersiz.");
+    const names: string[] = [];
+    for (const x of v) { const n = trTitle(cleanName(x, "area")); if (!names.includes(n)) names.push(n); }
+    if (names.length) out[d] = names;
+  }
+  return out;
 }
 
 /** Türkiye saatiyle bugünün başlangıcı (UTC+3 sabit) ISO olarak. */
@@ -194,7 +213,7 @@ export function cleanCity(raw: unknown): string {
 export function cleanName(raw: unknown, what: string): string {
   const v = String(raw ?? "").trim().replace(/\s+/g, " ");
   if (v.length < 2 || v.length > 50 || !/^[\p{L}\p{N} .&'-]+$/u.test(v)) {
-    throw new UserError("bad_" + what, `${what === "district" ? "İlçe" : "Sektör"} geçersiz: "${v.slice(0, 30)}"`);
+    throw new UserError("bad_" + what, `${what === "district" ? "İlçe" : what === "area" ? "Mahalle" : "Sektör"} geçersiz: "${v.slice(0, 30)}"`);
   }
   return v;
 }
@@ -243,7 +262,7 @@ export function cleanList(raw: unknown, max: number, what: string, canon: (s: st
 // ------------------------------------------------------------------ ortam / HTTP
 export interface Env {
   SUPABASE_URL: string; SERVICE_KEY: string; GOOGLE_API_KEY: string;
-  MAX_CALLS_PER_DAY: number; ALLOWED_ORIGINS: string[];
+  MAX_CALLS_PER_DAY: number | null; ALLOWED_ORIGINS: string[];   // null = günlük sınır yok
   SLEEP?: (ms: number) => Promise<void>;   // yalnızca testler için
 }
 type Fetch = (input: string, init?: any) => Promise<Response>;
@@ -254,7 +273,7 @@ export function loadEnv(get: (k: string) => string | undefined): Env {
     SUPABASE_URL: (get("SUPABASE_URL") ?? "").replace(/\/$/, ""),
     SERVICE_KEY: get("SCAN_SERVICE_KEY") || get("SUPABASE_SERVICE_ROLE_KEY") || "",
     GOOGLE_API_KEY: get("GOOGLE_API_KEY") ?? "",
-    MAX_CALLS_PER_DAY: Math.max(1, Number(get("MAX_CALLS_PER_DAY")) || 60),
+    MAX_CALLS_PER_DAY: Number(get("MAX_CALLS_PER_DAY")) > 0 ? Math.floor(Number(get("MAX_CALLS_PER_DAY"))) : null,
     ALLOWED_ORIGINS: [...DEFAULT_ALLOWED_ORIGINS, ...origins],
   };
 }
@@ -326,7 +345,7 @@ function lookups(db: Db, ctx: Ctx, now: number) {
   const ws = `workspace_id=eq.${ctx.workspace_id}`;
   return Promise.all([
     db.get(`/closed_regions?select=city,district&${ws}`),
-    db.get(`/scan_history?select=city,district,sector,scanned_at&${ws}&scanned_at=gte.${encodeURIComponent(new Date(now - RESCAN_DAYS * 86400_000).toISOString())}`),
+    db.get(`/scan_history?select=city,district,area,sector,scanned_at&${ws}&scanned_at=gte.${encodeURIComponent(new Date(now - RESCAN_DAYS * 86400_000).toISOString())}`),
     usageToday(db, ctx, now),
   ]);
 }
@@ -362,47 +381,56 @@ async function plan(db: Db, env: Env, ctx: Ctx, body: any, now: number) {
   const sectors = cleanList(body.sectors, 10, "sector", trLower);
   if (!sectors.length) throw new UserError("no_sector", "En az bir sektör girin.");
   cleanFilters(body.filters);
+  const areas = cleanAreas(body.areas, districts);
   const ds = districts.length ? districts : [""];
   const [closed, history, used] = await lookups(db, ctx, now);
   const units = [];
-  for (const district of ds) for (const sector of sectors) {
-    const recent = recentScan(history, city, district, sector, now);
+  for (const district of ds) for (const area of (areas[district] ?? [""])) for (const sector of sectors) {
+    const recent = recentScan(history, city, district, sector, now, area);
     units.push({
-      district, sector,
+      district, area, sector, pages: pagesFor(area),
       status: regionClosed(closed, city, district) ? "closed" : recent ? "recent" : "scan",
       last_scanned: recent?.scanned_at ?? null,
     });
   }
-  const todo = units.filter((u) => u.status === "scan").length;
-  return {
-    city, units, usage: { used, limit: env.MAX_CALLS_PER_DAY }, quota: quotaInfo(ctx),
-    est_calls: todo * MAX_PAGES, fits_today: Math.max(0, Math.floor((env.MAX_CALLS_PER_DAY - used) / MAX_PAGES)),
-  };
+  if (units.length > MAX_UNITS) {
+    throw new UserError("too_many", `Bir taramada en çok ${MAX_UNITS} bölge olabilir (şu an ${units.length}). Daha az ilçe, mahalle ya da sektör seçin.`);
+  }
+  const todoUnits = units.filter((u) => u.status === "scan");
+  const est = todoUnits.reduce((n, u) => n + u.pages, 0);
+  // Günlük sınır yoksa bugün hepsi taranabilir; varsa kalan çağrıya sığan bölge sayısı (sırayla)
+  let fits = todoUnits.length;
+  if (env.MAX_CALLS_PER_DAY != null) {
+    let left = env.MAX_CALLS_PER_DAY - used; fits = 0;
+    for (const u of todoUnits) { if (left <= 0) break; left -= u.pages; fits++; }
+  }
+  return { city, units, usage: { used, limit: env.MAX_CALLS_PER_DAY }, quota: quotaInfo(ctx), est_calls: est, fits_today: fits };
 }
 
 async function run(db: Db, env: Env, ctx: Ctx, f: Fetch, body: any, now: number) {
   const city = cleanCity(body.city);
   const district = body.district ? trTitle(cleanName(body.district, "district")) : "";
+  const area = body.area && district ? trTitle(cleanName(body.area, "area")) : "";
   const sector = trLower(cleanName(body.sector, "sector"));
   const force = body.force === true;
   const filters = cleanFilters(body.filters);
 
   const [closed, history, used] = await lookups(db, ctx, now);
   if (regionClosed(closed, city, district)) return { skipped: "closed", message: "Kapalı bölge, taranmadı." };
-  if (!force && recentScan(history, city, district, sector, now)) return { skipped: "recent", message: `${RESCAN_DAYS} gün içinde taranmış.` };
+  if (!force && recentScan(history, city, district, sector, now, area)) return { skipped: "recent", message: `${RESCAN_DAYS} gün içinde taranmış.` };
   const qLeft = quotaLeft(ctx);
   if (qLeft === 0) {
     throw new UserError("quota", `Bu ayki işletme kotası doldu (${ctx.lead_quota}). Yeni ay başında devam edebilir ya da paketinizi büyütebilirsiniz.`, 429);
   }
-  const left = env.MAX_CALLS_PER_DAY - used;
+  const left = env.MAX_CALLS_PER_DAY == null ? Infinity : env.MAX_CALLS_PER_DAY - used;
   // Mesaj müşteri şirkete de gider: çağrı sayısı gibi iç bilgi içermez (Vitrin, Yönetim sekmesinden görür)
   if (left <= 0) throw new UserError("daily_limit", "Bugünkü tarama sınırına ulaşıldı. Yarın devam edebilirsiniz.", 429);
   if (!env.GOOGLE_API_KEY) throw new UserError("not_configured", "GOOGLE_API_KEY gizli anahtarı Supabase'de tanımlı değil.", 500);
 
-  const query = [sector, district, city].filter(Boolean).join(" ");
+  const query = [sector, area ? area + " Mahallesi" : "", district, city].filter(Boolean).join(" ");
   const rows: Row[] = [], seen = new Set<string>(), reasons: Record<string, number> = {};
   let found = 0, calls = 0, token: string | undefined, warning: string | null = null;
-  for (let page = 0; page < Math.min(MAX_PAGES, left); page++) {
+  for (let page = 0; page < Math.min(pagesFor(area), left); page++) {
     let resp: any;
     try { resp = await searchText(env, f, query, token, env.SLEEP); }
     catch (e) { if (calls === 0) throw e; warning = (e as Error).message; break; }
@@ -424,10 +452,10 @@ async function run(db: Db, env: Env, ctx: Ctx, f: Fetch, body: any, now: number)
     capped = rows.length - qLeft;
   }
   const saved = toSave.length ? Number(await db.rpc("ingest_businesses", { p_workspace: ctx.workspace_id, p_rows: toSave })) || 0 : 0;
-  await db.insert("scan_history", { workspace_id: ctx.workspace_id, user_id: ctx.user_id, city, district, sector, places_found: found, saved, api_calls: calls });
+  await db.insert("scan_history", { workspace_id: ctx.workspace_id, user_id: ctx.user_id, city, district, area, sector, places_found: found, saved, api_calls: calls });
   if (capped) warning = [warning, `Aylık kota nedeniyle ${capped} işletme kaydedilmedi.`].filter(Boolean).join(" ");
   const quota = quotaInfo({ ...ctx, leads_this_month: ctx.leads_this_month + saved });
-  return { city, district, sector, found, matched: rows.length, saved, calls, reasons, warning, used: used + calls, limit: env.MAX_CALLS_PER_DAY, quota };
+  return { city, district, area, sector, found, matched: rows.length, saved, calls, reasons, warning, used: used + calls, limit: env.MAX_CALLS_PER_DAY, quota };
 }
 
 export async function handle(req: Request, env: Env, f: Fetch = fetch, now = Date.now()): Promise<Response> {

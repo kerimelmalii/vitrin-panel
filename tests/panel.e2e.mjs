@@ -248,6 +248,18 @@ assert.equal(await page.inputValue('#scDistricts'), 'Çankaya, Keçiören'); ass
 await page.click('#districtChips .chip:text-is("Keçiören")'); assert.equal(await page.inputValue('#scDistricts'), 'Çankaya');
 await page.click('#districtClear'); assert.equal(await page.inputValue('#scDistricts'), ''); assert.match(await txt('#districtSel'), /bütün şehir/);
 await page.fill('#scCity', 'İstanbul'); assert.equal(await page.locator('#districtChips .chip').count(), 39);
+assert.equal(await vis('#byAreaWrap'), false);
+await page.click('#districtChips .chip:text-is("Ataşehir")'); await page.waitForSelector('#byAreaWrap:not(.hide)');
+await page.check('#scByArea'); await page.waitForSelector('#areaChips .chip');
+assert.equal(await page.locator('#areaChips .chip').count(), 17); assert.equal(await page.locator('#areaChips .chip.on').count(), 17); assert.match(await txt('#areaChips .grp'), /Ataşehir · 17 mahalle/);
+await page.click('#areaNone'); assert.match(await txt('#areaCount'), /0 mahalle seçili/);
+await page.click('#areaChips .chip:text-is("Atatürk")'); await page.click('#areaChips .chip:text-is("Barbaros")'); assert.match(await txt('#areaCount'), /2 mahalle seçili · sektör başına 2 arama/);
+await page.fill('#scSectors', 'diş kliniği'); await page.click('#scPlan'); await page.waitForSelector('#scPlanWrap:not(.hide)');
+assert.deepEqual(scanCalls.at(-1).areas, { 'Ataşehir': ['Atatürk', 'Barbaros'] }); assert.deepEqual(scanCalls.at(-1).districts, 'Ataşehir');
+await page.uncheck('#scByArea'); assert.equal(await vis('#areaPick'), false);
+await page.click('#scPlan'); await page.waitForSelector('#scPlanWrap:not(.hide)'); assert.equal(scanCalls.at(-1).areas, undefined);
+await page.click('#districtClear'); assert.equal(await vis('#byAreaWrap'), false); await page.fill('#scSectors', 'kuaför');
+ok('mahalle mahalle tarama: ilçe seçilince seçenek çıkar, mahalleler (Ataşehir 17) seçilir ve plana gider');
 await page.click('#scTips summary'); assert.match(await txt('#scTips'), /özel hastane[\s\S]*Birden fazla ilçeyi birlikte seç/);
 ok('ilçeler şehre göre seçilebilir (Ankara 25, İstanbul 39), çoklu seçim ve temizle; öneriler kutusu');
 await page.click('#scTips summary');

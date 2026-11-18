@@ -1,0 +1,3 @@
+İl başına ilçe -> mahalle listesi (yalnızca şehir mahalleleri, köyler hariç).
+Kaynak: turkey-neighbourhoods 4.0.3 (PTT posta kodu listesinden derlenmiştir), MIT Lisansı.
+Copyright (c) 2020 Murat Gözel. https://github.com/muratgozel/turkey-neighbourhoods

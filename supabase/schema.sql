@@ -118,6 +118,7 @@ create table if not exists public.scan_history (
 );
 alter table public.scan_history add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
 alter table public.scan_history add column if not exists user_id uuid;   -- taramayı kim yaptı (yönetim paneli)
+alter table public.scan_history add column if not exists area text not null default '';   -- mahalle (mahalle mahalle taramada)
 
 -- ---------- Roller ----------
 -- Kullanıcıyı Supabase > Authentication > Users'tan siz eklersiniz; alanını ve rolünü panelde "Ekip" sekmesinden verirsiniz.
