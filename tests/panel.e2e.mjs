@@ -237,7 +237,16 @@ assert.equal(await vis('#biz'), false); assert.equal(await page.locator('#scHist
 assert.doesNotMatch(await txt('#scanView'), /Web sitesi olmayan/); ok('Tara sekmesi açıldı, son taramalar listelendi; sınırsız alanda kota satırı yok');
 await shot('08-tara'); await axe('tara');
 assert.equal(await page.locator('#sectorChips .chip').count(), 3);
-await page.click('#sectorChips .chip:text-is("kuaför")'); assert.equal(await page.inputValue('#scSectors'), 'kuaför'); ok('sektör çipleri alanın ayarından gelir ve alanı doldurur');
+await page.click('#sectorChips .chip:text-is("kuaför")'); assert.equal(await page.inputValue('#scSectors'), 'kuaför');
+await page.click('#sectorCatalog summary'); assert.equal(await page.locator('#catalogChips .grp').count(), 8); assert.match(await txt('#catalogChips .grp >> nth=0'), /Üretim ve sanayi/);
+await page.click('#catalogChips .chip:text-is("plastik enjeksiyon")'); assert.equal(await page.inputValue('#scSectors'), 'kuaför, plastik enjeksiyon');
+assert.equal(await page.locator('#catalogChips .chip.on').count(), 2); await page.waitForTimeout(200); await shot('08b-katalog'); await axe('sektör kataloğu');
+for (const x of ['fabrika','imalat','üretici','döküm','matbaa','toptancı','depo','otel']) await page.click(`#catalogChips .chip:text-is("${x}")`);
+await page.click('#catalogChips .chip:text-is("kafe")'); await page.waitForFunction(() => document.getElementById('toast').textContent.includes('en çok 10 sektör'));
+assert.equal((await page.inputValue('#scSectors')).split(',').length, 10);
+await page.fill('#scSectors', 'kuaför'); await page.dispatchEvent('#scSectors', 'input'); await page.click('#sectorCatalog summary');
+assert.equal(await page.locator('#catalogChips .chip.on').count(), 1);   // katalogdaki "kuaför"
+ok('sektör kataloğu: 8 grup (üretim ve sanayi başta), çip sektör ekler, en çok 10 sektör'); ok('sektör çipleri alanın ayarından gelir ve alanı doldurur');
 await page.fill('#scCity', 'mars'); await page.click('#scPlan');
 await page.waitForFunction(() => document.getElementById('toast').textContent.includes('Şehir tanınmadı')); assert.equal(await vis('#scRun'), false); ok('geçersiz şehir anlaşılır hata verir');
 assert.equal(await vis('#districtPick'), false);

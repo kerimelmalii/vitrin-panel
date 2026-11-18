@@ -574,6 +574,11 @@
         <label for="scSectors">Sektörler <span class="muted" style="font-weight:500">(virgülle ayırın; aşağıdan seçin ya da kendiniz yazın)</span></label>
         <input id="scSectors" placeholder="diş kliniği, avukat" autocomplete="off">
         <div class="chips" id="sectorChips" aria-label="Sektör önerileri"></div>
+        <details class="flt" id="sectorCatalog">
+          <summary><span>Sektör kataloğu <span class="muted" style="font-weight:600;margin-left:6px">üretim, sağlık, ticaret…</span></span></summary>
+          <div class="in"><div class="chips picks" id="catalogChips" role="group" aria-label="Sektör kataloğu"></div>
+            <p class="hint">Bir taramada en çok 10 sektör seçilebilir. Üreticileri ararken ürünü de yazın: "plastik ambalaj üreticisi", "çelik kapı imalatı" gibi.</p></div>
+        </details>
 
         <details class="flt" id="scFilters">
           <summary><span>Filtreler <span class="muted" id="fltSum" style="font-weight:600;margin-left:6px">isteğe bağlı</span></span></summary>
@@ -1717,11 +1722,32 @@ $('scDistricts').addEventListener('input', ()=>{ syncDistrictChips(); renderArea
 $('scCity').addEventListener('input', ()=>renderAreaChips());
 $('districtClear').onclick = ()=>{ $('scDistricts').value=''; syncDistrictChips(); renderAreaChips(); resetScanPlan(); };
 const sectorList = () => $('scSectors').value.split(',').map(s=>trLower(s.trim())).filter(Boolean);
-function syncSectorChips(){ const cur=sectorList(); document.querySelectorAll('#sectorChips .chip').forEach(c=>c.classList.toggle('on', cur.includes(trLower(c.textContent)))); }
+function syncSectorChips(){ const cur=sectorList(); document.querySelectorAll('#sectorChips .chip, #catalogChips .chip').forEach(c=>{ const on=cur.includes(trLower(c.textContent)); c.classList.toggle('on', on); c.setAttribute('aria-pressed', String(on)); }); }
+function sectorChip(s){ const b=el('button','chip',s); b.type='button'; b.onclick=()=>{ if(scanBusy) return;
+    const cur=sectorList(), i=cur.indexOf(trLower(s));
+    if(i<0 && cur.length>=10){ toast('Bir taramada en çok 10 sektör seçilebilir'); return; }
+    i>=0 ? cur.splice(i,1) : cur.push(s); $('scSectors').value=cur.join(', '); syncSectorChips(); resetScanPlan(); }; return b; }
+// Bütün şirketlerin kullanabileceği sektör kataloğu (Google Haritalar'da iyi sonuç veren arama ifadeleri)
+const SECTOR_CATALOG = [
+  ['Üretim ve sanayi', ['fabrika','imalat','üretici','tekstil fabrikası','konfeksiyon atölyesi','hazır giyim üreticisi','mobilya imalatı',
+    'metal işleme','CNC işleme','kalıp imalatı','makine imalatı','sac metal','kaynak atölyesi','döküm','plastik enjeksiyon','plastik ambalaj üreticisi',
+    'ambalaj üreticisi','karton kutu üreticisi','gıda üreticisi','unlu mamul üretimi','kimya fabrikası','boya üreticisi','kozmetik üreticisi',
+    'otomotiv yan sanayi','elektrik pano imalatı','kablo üreticisi','cam işleme','mermer işleme','ahşap atölyesi','matbaa','tabela imalatı']],
+  ['Toptan ticaret ve tedarik', ['toptancı','hırdavat toptan','inşaat malzemeleri','elektrik malzemeleri','medikal malzeme','kırtasiye toptan',
+    'gıda toptan','temizlik malzemeleri toptan','ambalaj malzemeleri','endüstriyel ekipman','iş güvenliği malzemeleri','lojistik firması','nakliye firması','depo']],
+  ['Sağlık', ['özel hastane','tıp merkezi','poliklinik','diş kliniği','fizik tedavi merkezi','göz kliniği','estetik kliniği','psikolog','diyetisyen',
+    'veteriner kliniği','eczane','laboratuvar','görüntüleme merkezi','evde bakım hizmetleri','huzurevi']],
+  ['Hukuk, finans, danışmanlık', ['avukat','hukuk bürosu','mali müşavir','muhasebe bürosu','danışmanlık firması','insan kaynakları danışmanlığı',
+    'sigorta acentesi','patent danışmanlığı','gümrük müşaviri','yazılım şirketi','reklam ajansı']],
+  ['İnşaat ve emlak', ['inşaat firması','müteahhit','mimarlık ofisi','iç mimarlık','emlak ofisi','tadilat','yapı denetim','peyzaj firması']],
+  ['Eğitim', ['özel okul','kreş','anaokulu','dershane','etüt merkezi','dil kursu','sürücü kursu','müzik kursu']],
+  ['Turizm ve yeme-içme', ['otel','butik otel','restoran','kafe','catering','düğün salonu','seyahat acentesi','araç kiralama']],
+  ['Bakım ve kişisel hizmet', ['oto servis','oto ekspertiz','oto yıkama','kuaför','güzellik salonu','spor salonu','temizlik şirketi','ilaçlama','çiçekçi','fotoğrafçı']],
+];
 function renderSectorChips(){
   const box=$('sectorChips'); box.replaceChildren();
-  (access.ws.sectors||[]).forEach(s=>{ const b=el('button','chip',s); b.type='button'; b.onclick=()=>{
-    const cur=sectorList(), i=cur.indexOf(trLower(s)); i>=0 ? cur.splice(i,1) : cur.push(s); $('scSectors').value=cur.join(', '); syncSectorChips(); resetScanPlan(); }; box.appendChild(b); });
+  (access.ws.sectors||[]).forEach(s=>box.appendChild(sectorChip(s)));
+  const cat=$('catalogChips'); if(!cat.children.length) SECTOR_CATALOG.forEach(([g,items])=>{ cat.appendChild(el('span','grp',g)); items.forEach(s=>cat.appendChild(sectorChip(s))); });
   syncSectorChips();
 }
 function renderScanQuota(q){
