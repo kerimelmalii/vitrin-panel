@@ -374,6 +374,36 @@ async function searchText(env: Env, f: Fetch, query: string, token?: string, sle
   return await r.json();
 }
 
+// ------------------------------------------------------------------ döviz kuru (TCMB)
+export const TCMB_URL = "https://www.tcmb.gov.tr/kurlar/today.xml";
+
+/** TCMB günlük kur dosyasından USD döviz satış kurunu ve bülten tarihini okur. Bulamazsa null. */
+export function parseTcmbUsd(xml: string): { rate: number; date: string | null } | null {
+  const block = xml.match(/<Currency\b[^>]*(?:CurrencyCode|Kod)="USD"[^>]*>([\s\S]*?)<\/Currency>/i);
+  if (!block) return null;
+  const pick = (tag: string) => { const m = block[1].match(new RegExp(`<${tag}>\\s*([0-9]+[.,][0-9]+)\\s*</${tag}>`, "i")); return m ? Number(m[1].replace(",", ".")) : NaN; };
+  let rate = pick("ForexSelling");
+  if (!Number.isFinite(rate)) rate = pick("BanknoteSelling");
+  if (!Number.isFinite(rate) || rate < 1 || rate > 1000) return null;
+  const d = xml.match(/Tarih="(\d{2})\.(\d{2})\.(\d{4})"/);
+  return { rate, date: d ? `${d[3]}-${d[2]}-${d[1]}` : null };
+}
+
+async function updateFx(db: Db, f: Fetch) {
+  let xml = "";
+  try {
+    const r = await f(TCMB_URL, { headers: { Accept: "application/xml" } });
+    if (!r.ok) throw new Error(String(r.status));
+    xml = await r.text();
+  } catch (e) {
+    throw new UserError("fx_unreachable", "TCMB kur dosyasına ulaşılamadı, biraz sonra tekrar deneyin. Kuru elle de girebilirsiniz.", 502);
+  }
+  const fx = parseTcmbUsd(xml);
+  if (!fx) throw new UserError("fx_parse", "TCMB kur dosyasında dolar kuru bulunamadı. Kuru elle girebilirsiniz.", 502);
+  const applied = (await db.rpc("set_fx_rate", { p_rate: fx.rate, p_date: fx.date })) === true;
+  return { usd_try: fx.rate, date: fx.date, applied };
+}
+
 // ------------------------------------------------------------------ işlemler
 async function plan(db: Db, env: Env, ctx: Ctx, body: any, now: number) {
   const city = cleanCity(body.city);
@@ -469,13 +499,18 @@ export async function handle(req: Request, env: Env, f: Fetch = fetch, now = Dat
     const db = new Db(env, f);
     // Alan, rol/izin ve kota veritabanında tek yerde tutulur (scan_context); tarama için "scan" izni gerekir
     const c = await db.rpc("scan_context", { p_user: userId });
+    let body: any;
+    try { body = await req.json(); } catch { throw new UserError("bad_json", "Geçersiz istek."); }
+    // Dolar kuru (yönetim paneli): yalnızca Vitrin yöneticileri
+    if (body?.action === "fx") {
+      if (!c || c.is_platform_admin !== true) throw new UserError("forbidden", "Bu işlem için yetkiniz yok.", 403);
+      return json(req, env, 200, await updateFx(db, f));
+    }
     if (!c || c.can_scan !== true || !c.workspace_id) {
       throw new UserError("forbidden", "Bu işlem için yetkiniz yok. Yöneticinizden tarama yetkisi isteyin.", 403);
     }
     const ctx: Ctx = { workspace_id: String(c.workspace_id), user_id: userId, lead_quota: c.lead_quota == null ? null : Number(c.lead_quota), leads_this_month: Number(c.leads_this_month) || 0 };
     if (!/^[0-9a-f-]{36}$/i.test(ctx.workspace_id)) throw new UserError("forbidden", "Alan bilgisi geçersiz.", 403);
-    let body: any;
-    try { body = await req.json(); } catch { throw new UserError("bad_json", "Geçersiz istek."); }
     if (body?.action === "plan") return json(req, env, 200, await plan(db, env, ctx, body, now));
     if (body?.action === "run") return json(req, env, 200, await run(db, env, ctx, f, body, now));
     throw new UserError("bad_action", "Geçersiz işlem.");

@@ -393,6 +393,31 @@ do $$ begin
   begin perform public.add_payment('99999999-0000-0000-0000-000000000001', current_date, 5, null, 'bitcoin'); raise exception 'geçersiz yöntem'; exception when raise_exception then if sqlerrm like 'geçersiz yöntem' then raise; end if; end;
   begin perform public.set_platform_settings('{"usd_try":"0"}'); raise exception 'sıfır kur'; exception when check_violation then null; end;
 end $$;
+-- Otomatik kur: tarama servisi (service_role) yazar; otomatik kapatılınca dokunmaz; kullanıcılar çağıramaz
+do $$ begin
+  begin perform public.set_fx_rate(42, current_date); raise exception 'kullanıcı kur yazdı'; exception when insufficient_privilege then null; end;
+end $$;
+reset role;
+set role service_role;
+select pg_temp.assert(public.set_fx_rate(42.1234, '2026-11-20'), 'otomatik kur yazıldı');
+select pg_temp.assert((public.scan_context('11111111-1111-1111-1111-111111111111')->>'is_platform_admin')::boolean, 'platform yöneticisi bağlamda');
+select pg_temp.assert(not (public.scan_context('55555555-5555-5555-5555-555555555555')->>'is_platform_admin')::boolean, 'pilot yöneticisi platform değil');
+reset role;
+set role authenticated;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+select pg_temp.assert((public.admin_billing()->>'usd_try')::numeric = 42.1234 and (public.admin_billing()->>'usd_try_date') = '2026-11-20'
+  and (public.admin_billing()->>'usd_try_auto')::boolean and (public.admin_billing()->>'usd_try_updated_at') is not null, 'otomatik kur yönetimde görünür');
+select public.set_platform_settings('{"usd_try_auto":false,"usd_try":"45"}');
+reset role; set role service_role;
+select pg_temp.assert(not public.set_fx_rate(50, '2026-11-21'), 'otomatik kapalıyken kur değişmez');
+do $$ begin
+  begin perform public.set_fx_rate(5000, current_date); raise exception 'saçma kur kabul'; exception when raise_exception then if sqlerrm like 'saçma%' then raise; end if; end;
+end $$;
+reset role; set role authenticated;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+select pg_temp.assert((public.admin_billing()->>'usd_try')::numeric = 45, 'elle girilen kur korunur');
+select public.set_platform_settings('{"usd_try_auto":true}');
+
 -- Müşteri şirket: ücret, ödeme ve ayarları göremez/değiştiremez
 set request.jwt.claim.sub = '55555555-5555-5555-5555-555555555555';
 do $$ begin

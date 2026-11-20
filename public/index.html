@@ -297,6 +297,7 @@
   .adm-row{display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding:13px 2px;border-bottom:1px solid var(--line)} .adm-row:last-child{border-bottom:0}
   .adm-row .t{font-weight:800;overflow-wrap:anywhere} .adm-row .s{font-size:13px;color:var(--mute)} .adm-row .r{text-align:right;font-size:13px;color:var(--mute);white-space:nowrap}
   .adm-row .r b{display:block;font-size:16px;color:var(--ink)}
+  .fxrow{display:flex;gap:6px 14px;flex-wrap:wrap;align-items:center;margin-top:10px;font-size:13px}
   .billset{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end;margin-top:14px}
   @media (max-width:480px){.billset{grid-template-columns:1fr 1fr}.billset .btn{grid-column:1/-1}}
   .bws{padding:14px 2px;border-top:1px solid var(--line)} .bws:first-child{margin-top:14px}
@@ -650,6 +651,8 @@
           <div><label for="bFixed">Aylık sabit gider (TL)</label><input id="bFixed" inputmode="decimal" placeholder="Vercel, Supabase…"></div>
           <button class="btn sm" id="bSetSave">Kaydet</button>
         </div>
+        <div class="fxrow"><label class="chk" style="margin:0"><input type="checkbox" id="bAuto"> <span>Kuru TCMB'den otomatik al</span></label>
+          <span class="muted" id="bFxInfo"></span> <button type="button" class="link" id="bFxNow">Şimdi güncelle</button></div>
         <p class="hint">Kazanç = tahsil edilen − Google maliyeti − sabit giderler. Google maliyeti, şirketin o ayki çağrıları × çağrı başına ~0,035 $ × dolar kuru ile tahmin edilir.</p>
         <div id="billWs"></div>
         <details style="margin-top:12px"><summary style="cursor:pointer;font-size:13.5px;font-weight:700;color:var(--mute)">Son 6 ay</summary><ul class="list compact" id="billHist"></ul></details>
@@ -1604,6 +1607,11 @@ async function loadBilling(){
   $('billTiles').lastChild.firstChild.classList.toggle('bad', t.profit < 0);
   tiles($('billTiles2'), [[TRY2.format(t.google_cost),'Google maliyeti'],[TRY.format(t.fixed_cost),'sabit gider'],[t.paying,'ödeyen şirket'],[t.unpaid,'ödemeyen / kısmi']]);
   if(document.activeElement!==$('bUsd')) $('bUsd').value = String(Number(b.usd_try)).replace('.',',');
+  const auto = b.usd_try_auto !== false; $('bAuto').checked = auto; $('bUsd').disabled = auto; $('bFxNow').classList.toggle('hide', !auto);
+  $('bFxInfo').textContent = auto ? (b.usd_try_date ? `TCMB döviz satış · ${fmtDay(b.usd_try_date)} bülteni` : 'TCMB kuru henüz alınmadı') : 'Elle girilen kur';
+  // Otomatikse ve kur 6 saatten eskiyse (ya da hiç alınmadıysa) TCMB'den bir kez tazelenir
+  const stale = !b.usd_try_updated_at || (Date.now() - new Date(b.usd_try_updated_at)) > 6*3600e3;
+  if(auto && stale && !fxTried){ fxTried = true; refreshFx(true); }
   if(document.activeElement!==$('bFixed')) $('bFixed').value = Number(b.fixed_monthly_cost) ? String(Number(b.fixed_monthly_cost)).replace('.',',') : '';
   const box=$('billWs'); box.replaceChildren();
   (b.workspaces||[]).filter(x=>!x.is_platform).forEach(x=>{
@@ -1649,10 +1657,23 @@ async function loadBilling(){
     li.append(el('div','t',new Date(Number(y),Number(m)-1,1).toLocaleDateString('tr-TR',{month:'long',year:'numeric'})),
               el('span','s',`tahsil ${TRY.format(h.collected)} · Google ${TRY2.format(h.google_cost)}`)); hl.appendChild(li); });
 }
+let fxTried = false;
+async function refreshFx(quiet){
+  try{ const r = await callScan({ action:'fx' }); if(!quiet) toast(`Dolar kuru güncellendi: ${String(r.usd_try).replace('.',',')} TL`); loadBilling(); }
+  catch(e){ if(!quiet) toast(e.message); else console.warn('TCMB kuru alınamadı:', e.message); }
+}
+$('bFxNow').onclick = ()=>refreshFx(false);
+$('bAuto').onchange = async ()=>{
+  const on=$('bAuto').checked; $('bUsd').disabled = on;
+  const { error } = await sb.rpc('set_platform_settings',{ p_patch:{ usd_try_auto:on } });
+  if(error){ toast('Kaydedilemedi: '+error.message); return; }
+  if(on){ fxTried = true; await refreshFx(false); } else { toast('Kur artık elle girilecek'); $('bUsd').focus(); loadBilling(); }
+};
 $('bSetSave').onclick = async ()=>{
-  const usd=parseMoney($('bUsd').value), fixed=$('bFixed').value.trim()==='' ? 0 : parseMoney($('bFixed').value);
-  if(!usd){ toast('Dolar kurunu sayı olarak yazın (örn. 41,5)'); return; } if(fixed==null){ toast('Sabit gideri sayı olarak yazın'); return; }
-  const { error } = await sb.rpc('set_platform_settings',{ p_patch:{ usd_try:String(usd), fixed_monthly_cost:String(fixed) } });
+  const auto=$('bAuto').checked, usd=parseMoney($('bUsd').value), fixed=$('bFixed').value.trim()==='' ? 0 : parseMoney($('bFixed').value);
+  if(!auto && !usd){ toast('Dolar kurunu sayı olarak yazın (örn. 41,5)'); return; } if(fixed==null){ toast('Sabit gideri sayı olarak yazın'); return; }
+  const patch = { fixed_monthly_cost:String(fixed) }; if(!auto) patch.usd_try = String(usd);
+  const { error } = await sb.rpc('set_platform_settings',{ p_patch:patch });
   if(error){ toast('Kaydedilemedi: '+error.message); return; } toast('Kur ve sabit gider kaydedildi'); loadBilling();
 };
 

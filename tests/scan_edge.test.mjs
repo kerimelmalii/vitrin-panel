@@ -59,7 +59,13 @@ test('İstanbul gün başlangıcı', () => {
 
 // ---------------- işleyici: sahte Supabase + Google
 const WS = '99999999-0000-0000-0000-000000000001';
-function world({ closed = [], history = [], usage = 0, user = true, places, googleStatus = 200, canScan = true, quota = null, monthUsed = 0, noRole = false } = {}) {
+const TCMB_XML = `<?xml version="1.0" encoding="UTF-8"?>
+<Tarih_Date Tarih="20.11.2026" Date="11/20/2026" Bulten_No="2026/220">
+  <Currency CrossOrder="0" Kod="USD" CurrencyCode="USD"><Unit>1</Unit><Isim>ABD DOLARI</Isim><CurrencyName>US DOLLAR</CurrencyName>
+    <ForexBuying>41.9512</ForexBuying><ForexSelling>42.0268</ForexSelling><BanknoteBuying>41.9218</BanknoteBuying><BanknoteSelling>42.0899</BanknoteSelling></Currency>
+  <Currency CrossOrder="1" Kod="AUD" CurrencyCode="AUD"><Unit>1</Unit><ForexBuying>27.1</ForexBuying><ForexSelling>27.3</ForexSelling></Currency>
+</Tarih_Date>`;
+function world({ closed = [], history = [], usage = 0, user = true, places, googleStatus = 200, canScan = true, quota = null, monthUsed = 0, noRole = false, platformAdmin = false, tcmb = TCMB_XML, tcmbStatus = 200 } = {}) {
   const log = { google: 0, ingest: [], history: [], authCalls: 0, wsFilters: [] };
   const pages = places ?? [{ places: [{ ...basePlace, id: 'a' }, { ...basePlace, id: 'b', rating: 3 }] }];
   const f = async (url, init = {}) => {
@@ -70,7 +76,9 @@ function world({ closed = [], history = [], usage = 0, user = true, places, goog
     if (u.includes('/rest/v1/closed_regions') || (u.includes('/rest/v1/scan_history') && !init.method)) log.wsFilters.push(u.includes('workspace_id=eq.' + WS));
     if (u.includes('/rest/v1/closed_regions')) return J(closed);
     if (u.includes('/rest/v1/scan_history') && !init.method) return J(u.includes('select=api_calls') ? [{ api_calls: usage }] : history);
-    if (u.includes('/rpc/scan_context')) { log.perm = body; return J(noRole ? null : { workspace_id: WS, can_scan: canScan, lead_quota: quota, leads_this_month: monthUsed }); }
+    if (u.includes('/rpc/scan_context')) { log.perm = body; return J(noRole ? null : { workspace_id: WS, can_scan: canScan, is_platform_admin: platformAdmin, lead_quota: quota, leads_this_month: monthUsed }); }
+    if (u.includes('tcmb.gov.tr')) { log.tcmb = (log.tcmb || 0) + 1; return new Response(tcmb, { status: tcmbStatus }); }
+    if (u.includes('/rpc/set_fx_rate')) { log.fx = body; return J(true); }
     if (u.includes('/rpc/ingest_businesses')) { log.ingest.push(body.p_rows); log.ingestWs = body.p_workspace; return J(body.p_rows.length); }
     if (u.endsWith('/rest/v1/scan_history') && init.method === 'POST') { log.history.push(body); return new Response(null, { status: 201 }); }
     throw new Error('beklenmeyen çağrı ' + u);
@@ -177,6 +185,26 @@ test('doygunluk: 3 sayfa dolu ve devamı varsa saturated, değilse değil', asyn
   assert.equal(j.calls, 2); assert.equal(j.saturated, false);
   j = await (await call(world(), { action: 'run', city: 'Ankara', district: 'Çankaya', sector: 'kuaför' })).json();
   assert.equal(j.saturated, false);
+});
+
+test('TCMB kuru: ayrıştırma', () => {
+  assert.deepEqual(fn.parseTcmbUsd(TCMB_XML), { rate: 42.0268, date: '2026-11-20' });
+  assert.deepEqual(fn.parseTcmbUsd(TCMB_XML.replace('<ForexSelling>42.0268</ForexSelling>', '<ForexSelling></ForexSelling>')), { rate: 42.0899, date: '2026-11-20' });
+  assert.equal(fn.parseTcmbUsd('<html>bakım</html>'), null);
+  assert.equal(fn.parseTcmbUsd(TCMB_XML.replace('42.0268', '0.5').replace('42.0899', '0.6')), null);
+});
+
+test('fx: yalnızca platform yöneticisi; kuru veritabanına yazar; hatada anlaşılır mesaj', async () => {
+  let w = world({ platformAdmin: true });
+  let r = await call(w, { action: 'fx' }); let j = await r.json();
+  assert.equal(r.status, 200); assert.deepEqual(j, { usd_try: 42.0268, date: '2026-11-20', applied: true });
+  assert.deepEqual(w.log.fx, { p_rate: 42.0268, p_date: '2026-11-20' }); assert.equal(w.log.google, 0);
+  w = world({ platformAdmin: false });
+  assert.equal((await call(w, { action: 'fx' })).status, 403); assert.equal(w.log.tcmb, undefined);
+  w = world({ platformAdmin: true, tcmbStatus: 503 });
+  r = await call(w, { action: 'fx' }); assert.equal(r.status, 502); assert.equal((await r.json()).error, 'fx_unreachable'); assert.equal(w.log.fx, undefined);
+  w = world({ platformAdmin: true, tcmb: '<x/>' });
+  assert.equal((await (await call(w, { action: 'fx' })).json()).error, 'fx_parse');
 });
 
 test('günlük çağrı sınırı tanımlı değilse uygulanmaz', async () => {

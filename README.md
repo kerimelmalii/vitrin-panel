@@ -43,7 +43,8 @@ Supabase'de bir kez:
 **Yönetim** sekmesi yalnızca platform (Vitrin) yöneticilerine görünür; müşteri şirketler göremez. Seçilen ay için:
 Google çağrısı ve tahmini maliyeti (çağrı başına ~0,035 $, `google_cost_per_call()` fonksiyonundan değiştirilir), bulunan işletme,
 işlem, tarama, aktif/toplam kullanıcı, kayıtlı satış; **şirket bazında** ve **kişi bazında** kullanım; onay bekleyenler.
-Alan (şirket) açma, kota ve demo ayarı da buradadır. Panelde yapay zekâ olmadığı için token harcaması yoktur.
+Alan (şirket) açma, kota ve demo ayarı da buradadır. **Dolar kuru** TCMB'nin günlük kur dosyasından (döviz satış) otomatik alınır:
+Yönetim açıldığında kur 6 saatten eskiyse tarama servisi üzerinden tazelenir; "Şimdi güncelle" ile elle de alınır. Otomatik kapatılırsa kur elle girilir. Panelde yapay zekâ olmadığı için token harcaması yoktur.
 
 ## Çalışma alanları (şirketler)
 
