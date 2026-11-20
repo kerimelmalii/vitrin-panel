@@ -748,7 +748,7 @@ begin
       from public.workspaces w order by w.is_platform desc, w.created_at;
 end $$;
 
-create or replace function public.create_workspace(p_name text, p_is_demo boolean default true, p_quota int default 500)
+create or replace function public.create_workspace(p_name text, p_is_demo boolean default true, p_quota int default 1000)
 returns uuid language plpgsql security definer set search_path = public as $$
 declare wid uuid; base text; s text; i int := 1;
 begin

@@ -18,7 +18,7 @@ Birden fazla şirket (çalışma alanı) aynı paneli kullanır; her şirket yal
    (tasarım/yayında → Satış tamamlandı, beklemede → Anlaşma aşamasında, iptal → İletişimde), eski "tutar" alanı satış kalemine taşınır.
 2. **Supabase > Edge Functions > scan:** `supabase/functions/scan/index.ts` dosyasının yeni halini yapıştırıp Deploy.
 3. Dalı birleştirin; Vercel yeni paneli yayınlar.
-4. **Pilot şirketi açın:** panelde **Yönetim > Alanlar** bölümünde şirket adını yazın, "Demo sürüm" işaretli ve kota 500 olarak **Alanı oluştur**.
+4. **Pilot şirketi açın:** panelde **Yönetim > Alanlar** bölümünde şirket adını yazın, "Demo sürüm" işaretli ve kota 1000 olarak **Alanı oluştur**.
 5. **Pilot kullanıcıları:** Supabase > Authentication > Users > Add user ile ekleyin. Kişi bir kez giriş yaptıktan sonra
    **Ekip** listesinde görünür; alanını (pilot şirket) ve rolünü seçip Kaydet. Pilot şirketin en az bir **Yönetici**si olsun:
    o kişi kendi ekibinin rollerini, mesaj şablonunu ve sektör önerilerini kendisi yönetir.
@@ -101,8 +101,9 @@ Hiç işlenmemiş (aranmamış, yazılmamış) işletme kaydı 30 gün sonra lis
 * **Günlük sınır:** varsayılan olarak **yok**. Bir alanın günlük Google çağrısını sınırlamak isterseniz `MAX_CALLS_PER_DAY` secret'ını ekleyin
   (örn. 200). Maliyet frenini Google tarafında tutun: Google Cloud > API'ler ve Hizmetler > Places API (New) > **Kotalar**'dan günlük istek sınırı koyun.
   Müşteri şirketlerin asıl sınırı aylık işletme kotasıdır.
-* **Mahalle mahalle tarama:** Google bir aramada en çok 60 sonuç verir. Tara'da ilçe seçince "Mahalle mahalle tara" çıkar; seçilen her mahalle ayrı aranır
-  (mahalle başına 1 çağrı, en çok 20 sonuç), böylece kalabalık ilçelerden çok daha fazla işletme gelir. Bir planda en çok 300 bölge olabilir.
+* **60 sonuç sınırı:** Google bir aramada en çok 60 sonuç verir. Bir ilçe taraması 60'a dolarsa panel o ilçeyi kendiliğinden mahallelere böler
+  (mahalle başına da 60'a kadar; sonraki sayfa yalnızca önceki doluysa istenir). İlçe seçilmemişse ve şehir 60'a dolarsa önce ilçelere bölünür.
+  60'a ulaşmayan aramalar bölünmez. İstenirse "Mahalle mahalle tara" ile mahalleler baştan seçilebilir. Bir planda en çok 300 bölge.
   Mahalle listesi `public/data/mahalle/<plaka>.json` (PTT verisi, bkz. `KAYNAK.txt`).
 * **Başka alan adı:** paneli başka adresten açacaksanız `ALLOWED_ORIGINS` secret'ına ekleyin (virgülle).
 * Aynı bölge+sektör **90 gün** tekrar taranmaz ("yeniden tara" ile zorlanır). Vitrin alanında Bursa kapalı bölgedir.

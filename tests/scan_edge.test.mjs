@@ -146,25 +146,37 @@ test('mahalle mahalle tarama: plan bölgeleri, sorgu, tek sayfa, geçmişe yazı
   let j = await (await call(w, { action: 'plan', city: 'istanbul', districts: 'Ataşehir, Kadıköy', sectors: 'diş kliniği',
     areas: { 'ataşehir': ['Atatürk', 'barbaros', 'Atatürk'] } })).json();
   assert.deepEqual(j.units.map((u) => [u.district, u.area, u.status, u.pages]),
-    [['Ataşehir', 'Atatürk', 'scan', 1], ['Ataşehir', 'Barbaros', 'recent', 1], ['Kadıköy', '', 'scan', 3]]);
-  assert.equal(j.est_calls, 4);
+    [['Ataşehir', 'Atatürk', 'scan', 3], ['Ataşehir', 'Barbaros', 'recent', 3], ['Kadıköy', '', 'scan', 3]]);
+  assert.equal(j.est_calls, 6);
   // seçilmeyen ilçeye mahalle, geçersiz ad ve çok fazla bölge reddedilir
   assert.equal((await call(w, { action: 'plan', city: 'İstanbul', districts: 'Ataşehir', sectors: 'x1', areas: { 'Kadıköy': ['Moda'] } })).status, 400);
   assert.equal((await call(w, { action: 'plan', city: 'İstanbul', districts: 'Ataşehir', sectors: 'x1', areas: { 'Ataşehir': ['<b>'] } })).status, 400);
   const many = Array.from({ length: 101 }, (_, i) => 'Mahalle ' + i);
   const r = await call(w, { action: 'plan', city: 'İstanbul', districts: 'Ataşehir', sectors: 'a1, b1, c1', areas: { 'Ataşehir': many } });
   assert.equal(r.status, 400); assert.match((await r.json()).message, /en çok 300 bölge/);
-  // çalıştırma: sorguda mahalle adı, en çok 1 sayfa, geçmişe mahalle yazılır; aynı mahalle 90 gün atlanır
+  // çalıştırma: sorguda mahalle adı, dolu sayfalar devam eder (en çok 3), geçmişe mahalle yazılır; aynı mahalle 90 gün atlanır
   const full = { places: Array.from({ length: 20 }, (_, i) => ({ ...basePlace, id: 'p' + i, formattedAddress: 'Atatürk Mh, Ataşehir/İstanbul', nationalPhoneNumber: `053${i % 10} 111 22 3${i % 10}` })), nextPageToken: 't' };
   w = world({ places: [full] }); let q = null; const inner = w.f;
   const f = async (u, i) => { if (String(u).includes('places.googleapis')) q = JSON.parse(i.body).textQuery; return inner(u, i); };
   j = await (await fn.handle(new Request('https://x/f', { method: 'POST', headers: { authorization: 'Bearer j' },
     body: JSON.stringify({ action: 'run', city: 'İstanbul', district: 'Ataşehir', area: 'atatürk', sector: 'diş kliniği' }) }), ENV, f, Date.parse('2026-10-09T12:00:00Z'))).json();
-  assert.equal(q, 'diş kliniği Atatürk Mahallesi Ataşehir İstanbul'); assert.equal(j.calls, 1); assert.equal(w.log.google, 1);
+  assert.equal(q, 'diş kliniği Atatürk Mahallesi Ataşehir İstanbul'); assert.equal(j.calls, 3); assert.equal(w.log.google, 3); assert.equal(j.saturated, true);
   assert.equal(w.log.history[0].area, 'Atatürk'); assert.equal(j.area, 'Atatürk');
   w = world({ history: [{ city: 'İstanbul', district: 'Ataşehir', area: 'Atatürk', sector: 'diş kliniği', scanned_at: recent }] });
   assert.equal((await (await call(w, { action: 'run', city: 'İstanbul', district: 'Ataşehir', area: 'Atatürk', sector: 'diş kliniği' })).json()).skipped, 'recent');
   assert.equal((await (await call(w, { action: 'run', city: 'İstanbul', district: 'Ataşehir', sector: 'diş kliniği' })).json()).skipped, undefined, 'ilçenin tamamı ayrı sayılır');
+});
+
+test('doygunluk: 3 sayfa dolu ve devamı varsa saturated, değilse değil', async () => {
+  const full = (id) => ({ places: Array.from({ length: 20 }, (_, i) => ({ ...basePlace, id: id + i, nationalPhoneNumber: `053${i % 10} 22${i % 10} 22 3${i % 10}` })), nextPageToken: 't' });
+  let w = world({ places: [full('a'), full('b'), full('c')] });
+  let j = await (await call(w, { action: 'run', city: 'Ankara', district: 'Çankaya', sector: 'kuaför' })).json();
+  assert.equal(j.found, 60); assert.equal(j.calls, 3); assert.equal(j.saturated, true);
+  w = world({ places: [full('a'), { places: [{ ...basePlace, id: 'z' }] }] });
+  j = await (await call(w, { action: 'run', city: 'Ankara', district: 'Çankaya', sector: 'kuaför' })).json();
+  assert.equal(j.calls, 2); assert.equal(j.saturated, false);
+  j = await (await call(world(), { action: 'run', city: 'Ankara', district: 'Çankaya', sector: 'kuaför' })).json();
+  assert.equal(j.saturated, false);
 });
 
 test('günlük çağrı sınırı tanımlı değilse uygulanmaz', async () => {

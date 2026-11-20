@@ -23,7 +23,7 @@ const FIELD_MASK = [
 export const RESCAN_DAYS = 90;
 const PAGE_SIZE = 20;
 const MAX_PAGES = 3;          // ilçe/şehir sorgusu: en çok 3 sayfa × 20 = 60 sonuç (Google'ın sınırı)
-const MAX_PAGES_AREA = 1;     // mahalle sorgusu: 1 sayfa (20 sonuç); mahalleler zaten ilçeyi parçalara böler
+const MAX_PAGES_AREA = 3;     // mahalle sorgusu da 60'a kadar; sonraki sayfa yalnızca önceki sayfa doluysa istenir
 const MAX_UNITS = 300;        // bir planda en çok bölge (ilçe/mahalle × sektör)
 const pagesFor = (area: string) => area ? MAX_PAGES_AREA : MAX_PAGES;
 const DEFAULT_ALLOWED_ORIGINS = ["https://panel.vitrinweb.com.tr"];
@@ -455,7 +455,9 @@ async function run(db: Db, env: Env, ctx: Ctx, f: Fetch, body: any, now: number)
   await db.insert("scan_history", { workspace_id: ctx.workspace_id, user_id: ctx.user_id, city, district, area, sector, places_found: found, saved, api_calls: calls });
   if (capped) warning = [warning, `Aylık kota nedeniyle ${capped} işletme kaydedilmedi.`].filter(Boolean).join(" ");
   const quota = quotaInfo({ ...ctx, leads_this_month: ctx.leads_this_month + saved });
-  return { city, district, area, sector, found, matched: rows.length, saved, calls, reasons, warning, used: used + calls, limit: env.MAX_CALLS_PER_DAY, quota };
+  // Google bir aramada en çok 60 sonuç verir: son sayfa da doluysa ve devamı varsa arama "doymuş"tur; panel bölgeyi böler
+  const saturated = !!token && calls >= pagesFor(area);
+  return { city, district, area, sector, found, matched: rows.length, saved, calls, reasons, warning, saturated, used: used + calls, limit: env.MAX_CALLS_PER_DAY, quota };
 }
 
 export async function handle(req: Request, env: Env, f: Fetch = fetch, now = Date.now()): Promise<Response> {

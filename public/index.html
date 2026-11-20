@@ -603,8 +603,8 @@
             <ul>
               <li><b>Sektörü dar yazın.</b> "hastane" yerine "özel hastane", "tıp merkezi", "poliklinik", "diş kliniği", "fizik tedavi merkezi" gibi. Geniş adlar acil servis, otopark, laboratuvar gibi birimleri de getirir; bunların çoğunda telefon olmadığı için elenir.</li>
               <li><b>Birden fazla ilçeyi birlikte seçin.</b> Her ilçe ayrı taranır ve ilçe başına en çok 60 sonuç gelir. Komşu ilçeleri (örneğin Ataşehir ile Kadıköy, Ümraniye, Maltepe) aynı anda seçebilirsiniz.</li>
-              <li><b>Büyük şehirlerde ilçe ilçe tarayın.</b> İlçe seçmezseniz bütün şehir tek sorguda taranır ve Google en çok 60 sonuç verir; ilçe ilçe taramak çok daha fazla işletme bulur.</li>
-              <li><b>Bir ilçeden daha fazlası için mahalle mahalle tarayın.</b> Google bir aramada en çok 60 sonuç verir. "Mahalle mahalle tara"yı açtığınızda her mahalle ayrı aranır; kalabalık ilçelerde çok daha fazla işletme bulunur. Mahalle sayısı arttıkça tarama uzar, bu yüzden önce işletmelerin yoğun olduğu mahalleleri seçin.</li>
+              <li><b>60 sonuç sınırı otomatik aşılır.</b> Google bir aramada en çok 60 sonuç verir. Bir ilçe 60'a ulaşırsa panel onu kendiliğinden mahallelere böler; ilçe seçmediyseniz şehir önce ilçelere bölünür. 60'a ulaşmayan aramalar bölünmez.</li>
+              <li><b>Mahalleleri baştan seçebilirsiniz.</b> "Mahalle mahalle tara"yı açıp yalnızca işletmelerin yoğun olduğu mahalleleri seçerseniz tarama daha kısa sürer.</li>
               <li><b>Aynı yeri tekrar taramayın.</b> Aynı ilçe ve sektör ikinci kez tarandığında sonuçların çoğu zaten listenizde olur. Kotanızı yeni ilçe ve sektörlere ayırın.</li>
             </ul>
           </div>
@@ -665,7 +665,7 @@
           <div class="section-t" style="margin-top:18px">Yeni alan aç</div>
           <div class="fgrid">
             <div class="wide"><label for="nwName">Şirket adı</label><input id="nwName" maxlength="60" placeholder="Örn. Pilot Şirket"></div>
-            <div><label for="nwQuota">Aylık işletme kotası</label><input id="nwQuota" type="number" min="0" value="500" inputmode="numeric"></div>
+            <div><label for="nwQuota">Aylık işletme kotası</label><input id="nwQuota" type="number" min="0" value="1000" inputmode="numeric"></div>
             <div><label class="chk" style="margin-top:30px"><input type="checkbox" id="nwDemo" checked> Demo sürüm</label></div>
             <div class="wide"><button class="btn block" id="nwCreate">Alanı oluştur</button></div>
           </div>
@@ -1836,9 +1836,20 @@ $('scRun').onclick = async ()=>{
   let saved=0, found=0, done=0, calls=0, stopReason='';
   const allReasons={};
   const logLine=(t,cls,sub)=>{ const d=el('div',cls,t); if(sub) d.appendChild(el('div','why',sub)); $('scLog').appendChild(d); };
-  for(const u of units){
+  // Google bir aramada en çok 60 sonuç verir. 60'a dolan şehir taraması ilçelere, ilçe taraması mahallelere
+  // otomatik bölünür (dolmayanlar bölünmez, ek çağrı yapılmaz).
+  const ukey = u => [u.district||'', u.area||'', u.sector].map(trLower).join('|');
+  const queue=[...units], planned=new Set(units.map(ukey)); let total=queue.length;
+  async function splitUnit(u){
+    let subs=[];
+    if(!u.district) subs = (DISTRICTS[scanPlan.city]||'').split('|').filter(Boolean).map(d=>({ district:d, area:'', sector:u.sector }));
+    else { try{ subs = ((await loadAreas(scanPlan.city))[u.district]||[]).map(n=>({ district:u.district, area:n, sector:u.sector })); }catch(e){ subs=[]; } }
+    return subs.filter(x=>!planned.has(ukey(x)));
+  }
+  while(queue.length){
+    const u=queue.shift();
     if(scanStop){ stopReason='Durduruldu.'; break; }
-    $('scProgTitle').textContent = `Taranıyor · ${done+1}/${units.length}`;
+    $('scProgTitle').textContent = `Taranıyor · ${done+1}/${total}`;
     $('scProgTxt').textContent = `${scanPlan.city} / ${unitLabel(u)} · şu ana kadar ${saved} yeni`;
     try{
       const r = await callScan({ action:'run', city:scanPlan.city, district:u.district, area:u.area||'', sector:u.sector, force, filters });
@@ -1847,13 +1858,17 @@ $('scRun').onclick = async ()=>{
         Object.entries(r.reasons||{}).forEach(([k,n])=>{ allReasons[k]=(allReasons[k]||0)+n; });
         const dup = r.matched - r.saved, why = [whyText(r.reasons), dup>0 && !/kota/i.test(r.warning||'') ? `${dup} zaten listede` : ''].filter(Boolean).join(' · ');
         logLine(`${unitLabel(u)}: ${r.found} bulundu, ${r.matched} uygun, ${r.saved} yeni kaydedildi`+(r.warning?' ('+r.warning+')':''), r.saved?'ok':'muted', why);
-        if(r.quota && r.quota.left===0){ stopReason='Aylık kota doldu.'; done++; break; } }
+        if(r.quota && r.quota.left===0){ stopReason='Aylık kota doldu.'; done++; break; }
+        if(r.saturated && !u.area){
+          const subs = await splitUnit(u);
+          if(subs.length){ subs.forEach(x=>planned.add(ukey(x))); queue.unshift(...subs); total += subs.length;
+            logLine(`${unitLabel(u)}: Google'ın 60 sonuç sınırına ulaşıldı, ${subs.length} ${u.district?'mahalle':'ilçe'} ayrı ayrı taranıyor.`, 'muted'); } } }
     }catch(e){ logLine(`${unitLabel(u)}: ${e.message}`,'bad'); stopReason='Hata nedeniyle durdu.'; break; }
-    done++; $('scBar').style.width = Math.round(done/units.length*100)+'%';
+    done++; $('scBar').style.width = Math.round(done/total*100)+'%';
   }
   scanBusy=false; setScanLocked(false);
   $('scProg').classList.add('hide'); $('scBar').style.width='0';
-  logLine(`${stopReason?stopReason+' ':''}Özet: ${found} bulundu, ${saved} yeni kaydedildi` + (access.ws.isPlatform ? `, ${calls} Google çağrısı.` : '.'), 'sum ok', units.length>1 ? whyText(allReasons) : '');
+  logLine(`${stopReason?stopReason+' ':''}Özet: ${found} bulundu, ${saved} yeni kaydedildi` + (access.ws.isPlatform ? `, ${calls} Google çağrısı.` : '.'), 'sum ok', total>1 ? whyText(allReasons) : '');
   resetScanPlan(); toast(saved?`${saved} yeni işletme eklendi`:'Yeni işletme eklenmedi');
   await Promise.all([loadScanHistory(), loadFilters(), refreshCounts()]);
 };

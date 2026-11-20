@@ -228,6 +228,8 @@ await page.route('**/functions/v1/scan', async route => {
       { district: 'Çankaya', sector: 'kuaför', status: 'recent' }, { district: 'Keçiören', sector: 'kuaför', status: 'scan' }, { district: 'Yenimahalle', sector: 'kuaför', status: 'scan' }, { district: 'Mamak', sector: 'kuaför', status: 'closed' }] });
   }
   if (scanMode === 'slow') await new Promise(r => setTimeout(r, 400));
+  if (scanMode === 'saturate') return J(200, { city: b.city, district: b.district, area: b.area, sector: b.sector, found: b.area ? 12 : 60, matched: b.area ? 4 : 30,
+    saved: b.area ? 4 : 30, calls: b.area ? 1 : 3, reasons: {}, warning: null, saturated: b.district === 'Keçiören' && !b.area, used: 6, limit: null });
   if (scanMode === 'fail' && b.district === 'Yenimahalle') return J(429, { error: 'daily_limit', message: 'Bugünkü tarama sınırına ulaşıldı. Yarın devam edebilirsiniz.' });
   return J(200, { city: b.city, district: b.district, sector: b.sector, found: 60, matched: 33, saved: 31, calls: 3, reasons: { 'bölge dışı': 18, 'telefon yok/geçersiz': 7, 'kapalı': 2, 'kategori uygun değil': 1 }, warning: null, used: 6, limit: 60 });
 });
@@ -294,6 +296,17 @@ assert.match(await txt('#scRun'), /3 bölge/); scanCalls.length = 0; await page.
 const fr = scanCalls.filter(c => c.action === 'run'); assert.equal(fr.every(c => c.force === true), true);
 assert.deepEqual(fr[0].filters, { min_rating: 4.3, min_reviews: 10, max_reviews: 300, open_days: [6] }); ok('filtreler (puan, yorum, çalışma günü) taramaya gider; "yeniden tara" force gönderir');
 await page.uncheck('#scForce');
+// 60'a dolan ilçe kendiliğinden mahallelere bölünür; dolmayan bölünmez
+const KEC = JSON.parse(fs.readFileSync(new URL('../public/data/mahalle/06.json', import.meta.url), 'utf8'))['Keçiören'].length;
+scanMode = 'saturate'; await page.click('#scPlan'); await page.waitForSelector('#scRun:not(.hide)'); scanCalls.length = 0; await page.click('#scRun');
+await page.waitForFunction(() => document.getElementById('scLog').textContent.includes('Özet'), null, { timeout: 60000 });
+{ const runs = scanCalls.filter(c => c.action === 'run');
+  assert.equal(runs.filter(c => c.district === 'Keçiören' && c.area).length, KEC, 'Keçiören mahalleleri');
+  assert.equal(runs.filter(c => c.district === 'Yenimahalle').length, 1, 'dolmayan ilçe bölünmez');
+  assert.ok(runs.every(c => c.force === false && 'filters' in c));
+  assert.match(await txt('#scLog'), new RegExp(`Keçiören · kuaför: Google'ın 60 sonuç sınırına ulaşıldı, ${KEC} mahalle ayrı ayrı taranıyor`));
+  assert.match(await txt('#scLog'), /Keçiören \/ \S+ Mah\. · kuaför: 12 bulundu/); }
+ok(`60'a dolan ilçe otomatik olarak mahallelerine (${KEC}) bölünür, dolmayan ilçe bölünmez`);
 scanMode = 'fail'; await page.click('#scPlan'); await page.waitForSelector('#scRun:not(.hide)'); await page.click('#scRun');
 await page.waitForFunction(() => document.getElementById('scLog').textContent.includes('Özet'));
 const logTxt = await txt('#scLog'); assert.match(logTxt, /Bugünkü tarama sınırına ulaşıldı/); assert.match(logTxt, /Hata nedeniyle durdu/); assert.match(logTxt, /31 yeni kaydedildi/); ok('hata gelince durur, o ana kadarki sonuç korunur');
