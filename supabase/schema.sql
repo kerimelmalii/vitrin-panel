@@ -190,6 +190,10 @@ create table if not exists public.platform_settings (
   updated_at         timestamptz not null default now()
 );
 insert into public.platform_settings (id) values (true) on conflict do nothing;
+alter table public.platform_settings
+  add column if not exists usd_try_auto       boolean not null default true,   -- kur TCMB'den otomatik çekilsin mi
+  add column if not exists usd_try_date       date,                            -- TCMB bülten tarihi
+  add column if not exists usd_try_updated_at timestamptz;
 
 -- Satış kalemleri: hangi üründen kaç adet, toplam kaça
 create table if not exists public.customer_sales (
@@ -453,6 +457,7 @@ drop function if exists public.admin_billing(date);
 drop function if exists public.add_payment(uuid,date,numeric,date,text,text);
 drop function if exists public.delete_payment(uuid);
 drop function if exists public.set_platform_settings(jsonb);
+drop function if exists public.set_fx_rate(numeric,date);
 
 create or replace function public.next_business(p_list text, p_city text default null,
                                                 p_sector text default null, p_skip uuid[] default '{}')
@@ -660,6 +665,7 @@ create or replace function public.scan_context(p_user uuid)
 returns jsonb language sql stable security definer set search_path = public as $$
   select jsonb_build_object(
     'workspace_id', w.id, 'can_scan', 'scan' = any (public.role_perms(ur.role)),
+    'is_platform_admin', (ur.role = 'admin' and w.is_platform),
     'lead_quota', w.lead_quota, 'leads_this_month', public.ws_leads_this_month(w.id))
     from public.user_roles ur join public.workspaces w on w.id = ur.workspace_id
    where ur.user_id = p_user
@@ -1066,6 +1072,7 @@ begin
   )
   select jsonb_build_object(
     'month', to_char(m, 'YYYY-MM'), 'usd_try', st.usd_try, 'fixed_monthly_cost', st.fixed_monthly_cost,
+    'usd_try_auto', st.usd_try_auto, 'usd_try_date', st.usd_try_date, 'usd_try_updated_at', st.usd_try_updated_at,
     'cost_per_call_usd', public.google_cost_per_call(),
     'totals', (select jsonb_build_object(
         'expected',    coalesce(sum(monthly_fee) filter (where not is_platform), 0),
@@ -1126,13 +1133,24 @@ begin
   if not public.is_platform_admin() then raise exception 'Bu işlem için yetkiniz yok'; end if;
   if jsonb_typeof(p_patch) <> 'object' then raise exception 'Geçersiz istek'; end if;
   for k in select jsonb_object_keys(p_patch) loop
-    if k not in ('usd_try','fixed_monthly_cost') then raise exception 'Güncellenemeyen alan: %', k; end if;
+    if k not in ('usd_try','fixed_monthly_cost','usd_try_auto') then raise exception 'Güncellenemeyen alan: %', k; end if;
   end loop;
   update public.platform_settings set
     usd_try            = case when p_patch ? 'usd_try' then (p_patch->>'usd_try')::numeric else usd_try end,
+    usd_try_auto       = case when p_patch ? 'usd_try_auto' then (p_patch->>'usd_try_auto')::boolean else usd_try_auto end,
     fixed_monthly_cost = case when p_patch ? 'fixed_monthly_cost' then coalesce(nullif(p_patch->>'fixed_monthly_cost', '')::numeric, 0) else fixed_monthly_cost end,
     updated_at = now()
    where id;
+end $$;
+
+-- Tarama servisi (service_role) TCMB'den aldığı USD satış kurunu yazar; otomatik kapalıysa dokunmaz
+create or replace function public.set_fx_rate(p_rate numeric, p_date date)
+returns boolean language plpgsql security definer set search_path = public as $$
+begin
+  if p_rate is null or p_rate < 1 or p_rate > 1000 then raise exception 'Geçersiz kur: %', p_rate; end if;
+  update public.platform_settings set usd_try = round(p_rate, 4), usd_try_date = p_date, usd_try_updated_at = now(), updated_at = now()
+   where id and usd_try_auto;
+  return found;
 end $$;
 
 -- Fonksiyon yetkileri: anon hiçbirini çağıramaz
@@ -1146,7 +1164,7 @@ revoke all on function public.next_business(text,text,text,uuid[]), public.relea
   public.monthly_report(date), public.list_workspaces(), public.create_workspace(text,boolean,int), public.update_workspace(uuid,jsonb),
   public.admin_usage(date), public.google_cost_per_call(),
   public.admin_billing(date), public.add_payment(uuid,date,numeric,date,text,text), public.delete_payment(uuid), public.set_platform_settings(jsonb),
-  public.has_perm(text), public.role_perms(text), public.stage_label(text), public.reason_label(text), public.my_ws(),
+  public.set_fx_rate(numeric,date), public.has_perm(text), public.role_perms(text), public.stage_label(text), public.reason_label(text), public.my_ws(),
   public.is_platform_admin(), public.platform_ws(), public.ws_leads_this_month(uuid), public.tr_month_start(timestamptz)
   from public, anon, authenticated;
 grant execute on function public.next_business(text,text,text,uuid[]), public.release_business(uuid),
@@ -1161,7 +1179,7 @@ grant execute on function public.next_business(text,text,text,uuid[]), public.re
   public.set_platform_settings(jsonb), public.stage_label(text), public.reason_label(text), public.tr_month_start(timestamptz) to authenticated;
 -- Politikalar ve görünümler bu fonksiyonları çağırdığı için giriş yapmış kullanıcıda çalışabilmeli
 grant execute on function public.has_perm(text), public.role_perms(text), public.my_ws(), public.is_platform_admin() to authenticated;
-grant execute on function public.ingest_businesses(uuid,jsonb), public.scan_context(uuid), public.purge_stale_leads() to service_role;
+grant execute on function public.ingest_businesses(uuid,jsonb), public.scan_context(uuid), public.purge_stale_leads(), public.set_fx_rate(numeric,date) to service_role;
 
 -- ---------- Raporlar (Türkiye saati; giriş yapan yetkili kullanıcı kendi alanını okur) ----------
 --  donen = bir cevap alınan işlem (ilgilendi, sonra ara, satış, ret); ulasilamadi = açmadı / yanlış numara / kapanmış

@@ -221,6 +221,7 @@ await page.route('**/functions/v1/scan', async route => {
   const b = JSON.parse(req.postData());
   scanCalls.push({ ...b, auth: req.headers()['authorization'], apikey: req.headers()['apikey'] });
   const J = (status, body) => route.fulfill({ status, headers: cors, contentType: 'application/json', body: JSON.stringify(body) });
+  if (b.action === 'fx') return J(200, { usd_try: 42.0268, date: '2026-11-20', applied: true });
   if (scanMode === 'missing') return route.fulfill({ status: 404, headers: cors, body: 'not found' });
   if (b.action === 'plan') {
     if (b.city.toLowerCase() === 'mars') return J(400, { error: 'bad_city', message: 'Şehir tanınmadı. 81 ilden birini yazın (örn. Ankara).' });
@@ -365,7 +366,12 @@ assert.match((await last('admin_usage'))[1].p_month, /^\d{4}-\d{2}-01$/); ok('y�
 await page.selectOption('#admMonth', { index: 0 }); await page.waitForSelector('#billWs .bws');
 assert.match(await txt('#billTiles'), /1\.000\s*beklenen gelir/); assert.match(await txt('#billTiles'), /600\s*tahsil edilen/); assert.match(await txt('#billTiles'), /400\s*bekleyen/);
 assert.match(await txt('#billWs'), /Pilot Şirket · Demo[\s\S]*Kısmi ödendi[\s\S]*kalan[\s\S]*400/); assert.match(await txt('#billWs'), /Havale\/EFT · ₺600 · ilk taksit/);
-assert.equal(await page.inputValue('#bUsd'), '41'); await page.waitForTimeout(300); await shot('12b-odemeler'); await axe('ödemeler');
+assert.equal(await page.inputValue('#bUsd'), '41'); assert.equal(await page.isChecked('#bAuto'), true); assert.equal(await page.locator('#bUsd').isDisabled(), true);
+await page.waitForFunction(() => document.getElementById('bFxInfo').textContent.length > 0); assert.match(await txt('#bFxInfo'), /TCMB/);
+await page.waitForTimeout(300); assert.equal(scanCalls.filter(c => c.action === 'fx').length, 1, 'eski kur için TCMB bir kez sorulur');
+await shot('12b-odemeler'); await axe('ödemeler');
+await page.click('#bFxNow'); await page.waitForFunction(() => document.getElementById('toast').textContent.includes('42,0268'));
+assert.equal(scanCalls.filter(c => c.action === 'fx').length, 2); ok('dolar kuru TCMB\'den otomatik alınır (eskiyse kendiliğinden, "Şimdi güncelle" ile elle)');
 ok('ödemeler: beklenen, tahsil edilen, bekleyen; şirkette durum, kalan ve ödeme geçmişi');
 await page.click('#billWs .bws:has-text("Pilot") .acts .link:text-is("+ Ödeme ekle")');
 assert.equal(await page.inputValue('#billWs .payform input >> nth=0'), '400'); await page.fill('#billWs .payform input >> nth=0', 'abc'); await page.click('#billWs .payform .btn');
@@ -379,6 +385,8 @@ await page.waitForFunction(() => /Kısmi ödendi/.test(document.getElementById('
 await page.click('#billWs .bws:has-text("Pilot") .acts .link:text-is("Aylık ücreti değiştir")'); await page.click('#billWs .payform .chip:has-text("2.000")'); await page.click('#billWs .payform .btn');
 await page.waitForFunction(() => /2\.000/.test(document.getElementById('billTiles').textContent));
 assert.deepEqual((await last('update_workspace'))[1], { p_ws: 'w1', p_patch: { monthly_fee: '2000' } }); ok('aylık ücret paket çipiyle değiştirilir');
+await page.uncheck('#bAuto'); await page.waitForFunction(() => document.getElementById('toast').textContent.includes('elle girilecek'));
+assert.deepEqual((await last('set_platform_settings'))[1].p_patch, { usd_try_auto: false }); assert.equal(await page.locator('#bUsd').isDisabled(), false);
 await page.fill('#bUsd', '42,5'); await page.fill('#bFixed', '1.800'); await page.click('#bSetSave');
 await page.waitForFunction(() => document.getElementById('toast').textContent.includes('Kur ve sabit gider'));
 assert.deepEqual((await last('set_platform_settings'))[1].p_patch, { usd_try: '42.5', fixed_monthly_cost: '1800' });

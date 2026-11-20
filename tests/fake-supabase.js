@@ -56,7 +56,7 @@
   ];
   const needs = (perm, fn) => a => has(perm) ? fn(a) : deny();
   // Ödeme takibi (yalnızca platform yöneticisi)
-  const fees = { w1: 1000 }, psettings = { usd_try: 41, fixed_monthly_cost: 0 };
+  const fees = { w1: 1000 }, psettings = { usd_try: 41, fixed_monthly_cost: 0, usd_try_auto: true, usd_try_date: null, usd_try_updated_at: null };
   const pays = [{ id: 'p0', ws: 'w1', amount: 600, paid_at: '2026-11-03', method: 'havale', note: 'ilk taksit' }];
   const billing = () => {
     const rows = workspaces.map(w => { const paid = pays.filter(p => p.ws === w.id).reduce((a, p) => a + p.amount, 0), fee = w.is_platform ? 0 : (fees[w.id] || 0);
@@ -66,6 +66,7 @@
         payments: pays.filter(p => p.ws === w.id).map(p => ({ ...p })) }; });
     const sum = f => rows.reduce((a, r) => a + f(r), 0), collected = sum(r => r.paid), gcost = sum(r => r.google_cost);
     return { month: '2026-11', usd_try: psettings.usd_try, fixed_monthly_cost: psettings.fixed_monthly_cost, cost_per_call_usd: 0.035,
+      usd_try_auto: psettings.usd_try_auto, usd_try_date: psettings.usd_try_date, usd_try_updated_at: psettings.usd_try_updated_at,
       totals: { expected: sum(r => r.is_platform ? 0 : r.monthly_fee), collected, outstanding: sum(r => r.is_platform ? 0 : r.remaining), google_cost: gcost,
         fixed_cost: psettings.fixed_monthly_cost, profit: collected - gcost - psettings.fixed_monthly_cost, paying: rows.filter(r => r.status === 'paid').length,
         unpaid: rows.filter(r => ['unpaid', 'partial'].includes(r.status)).length },
@@ -119,7 +120,9 @@
     admin_billing: a => (role === 'admin' && ws.is_platform) ? billing(a) : deny(),
     add_payment: a => (role === 'admin' && ws.is_platform) ? (pays.push({ id: 'p' + (++seq), ws: a.p_ws, amount: a.p_amount, paid_at: a.p_paid_at, method: a.p_method, note: a.p_note }), 'p' + seq) : deny(),
     delete_payment: a => (role === 'admin' && ws.is_platform) ? (pays.splice(pays.findIndex(p => p.id === a.p_id), 1), null) : deny(),
-    set_platform_settings: a => (role === 'admin' && ws.is_platform) ? (Object.assign(psettings, { usd_try: Number(a.p_patch.usd_try), fixed_monthly_cost: Number(a.p_patch.fixed_monthly_cost) }), null) : deny(),
+    set_platform_settings: a => { if (!(role === 'admin' && ws.is_platform)) return deny(); const p = a.p_patch;
+      if ('usd_try' in p) psettings.usd_try = Number(p.usd_try); if ('fixed_monthly_cost' in p) psettings.fixed_monthly_cost = Number(p.fixed_monthly_cost);
+      if ('usd_try_auto' in p) psettings.usd_try_auto = p.usd_try_auto; return null; },
     admin_usage: a => (role === 'admin' && ws.is_platform) ? { month: (a.p_month || '').slice(0, 7), cost_per_call: 0.035,
       totals: { api_calls: 42, scans: 14, leads: 62, actions: log.length + 9, wa_sent: 3, won: 1, sales_total: 8500, active_users: 2, users: users.length,
         pending: users.filter(u => u.role === 'none').length },
